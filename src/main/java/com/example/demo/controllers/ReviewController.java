@@ -15,16 +15,32 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getReview(@PathVariable long id) {
+    public ResponseEntity<?> getReview(@PathVariable Long id) {
         return ResponseEntity.ok(reviewService.getByProductId(id));
     }
+
     @PostMapping
     public ResponseEntity<?> createReview(@RequestBody ReviewRequest review) {
         return ResponseEntity.ok(reviewService.createReview(review));
     }
+
     @PostMapping("/helpful")
-    public ResponseEntity<?> toggleReviewHelpful(@RequestParam long reviewId, @RequestParam long userId) {
-        reviewService.toggleHelpful(userId, reviewId);
-        return ResponseEntity.ok("Review has been successfully toggled.");
+    public ResponseEntity<?> toggleReviewHelpful(@RequestParam Long reviewId, @RequestParam Long userId) {
+        boolean isHelpful = reviewService.toggleHelpful(userId, reviewId);
+        return ResponseEntity.ok(isHelpful);
     }
+
+    @PutMapping
+    public ResponseEntity<?> updateReview(@RequestParam Long reviewId,
+                                          @RequestParam Long userId,
+                                          @RequestBody ReviewRequest reviewRequest) {
+        return ResponseEntity.ok(reviewService.updateReview(userId, reviewId, reviewRequest));
+    }
+
+    @DeleteMapping("/{reviewId}")
+    public ResponseEntity<?> deleteReview(@PathVariable Long reviewId) {
+        reviewService.deleteReview(reviewId);
+        return ResponseEntity.noContent().build();
+    }
+
 }

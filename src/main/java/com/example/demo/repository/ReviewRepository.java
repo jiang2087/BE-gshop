@@ -28,8 +28,11 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             FROM Review r
             JOIN r.productVariant pv
             WHERE pv.product.id = :productId
+            ORDER BY r.helpfulCount
             """)
     List<ReviewResponse> findByProductId(Long productId);
+
+
 
     @Modifying
     @Query("""
@@ -37,7 +40,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                 SET r.helpfulCount = r.helpfulCount + 1
                 WHERE r.id = :reviewId
             """)
-    int increaseHelpfulCount(Long reviewId);
+    void increaseHelpfulCount(Long reviewId);
 
     @Modifying
     @Query("""
@@ -45,5 +48,5 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                 SET r.helpfulCount = r.helpfulCount - 1
                 WHERE r.id = :reviewId
             """)
-    int decreaseHelpfulCount(Long reviewId);
+    void decreaseHelpfulCount(Long reviewId);
 }

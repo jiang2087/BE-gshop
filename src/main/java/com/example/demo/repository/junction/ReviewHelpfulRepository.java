@@ -1,4 +1,4 @@
-package com.example.demo.repository;
+package com.example.demo.repository.junction;
 
 import com.example.demo.models.ReviewHelpful;
 import com.example.demo.models.junction.ReviewHelpfulId;
@@ -9,4 +9,6 @@ public interface ReviewHelpfulRepository extends JpaRepository<ReviewHelpful, Re
     boolean existsByUserIdAndReviewId(Long userId, Long reviewId);
 
     void deleteByUserIdAndReviewId(Long userId, Long reviewId);
+
+    void deleteByReviewId(Long reviewId);
 }

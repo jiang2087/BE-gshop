@@ -6,18 +6,15 @@ import com.example.demo.models.Review;
 import com.example.demo.models.ReviewHelpful;
 import com.example.demo.models.junction.ReviewHelpfulId;
 import com.example.demo.repository.OrderRepository;
-import com.example.demo.repository.ReviewHelpfulRepository;
+import com.example.demo.repository.junction.ReviewHelpfulRepository;
 import com.example.demo.repository.ReviewRepository;
 import com.example.demo.repository.UserRepository;
-import com.example.demo.repository.products.ProductRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -92,8 +89,9 @@ public class ReviewService {
              throw new RuntimeException("you can not adjust this Comment.");
          }
     }
+
     @Transactional
-    public void toggleHelpful(Long userId, Long reviewId) {
+    public boolean toggleHelpful(Long userId, Long reviewId) {
 
         boolean exists = reviewHelpfulRepository
                 .existsByUserIdAndReviewId(userId, reviewId);
@@ -101,6 +99,7 @@ public class ReviewService {
         if (exists) {
             reviewHelpfulRepository.deleteByUserIdAndReviewId(userId, reviewId);
             reviewRepository.decreaseHelpfulCount(reviewId);
+            return false;
         } else {
             ReviewHelpful helpful = new ReviewHelpful();
             helpful.setId(new ReviewHelpfulId(userId, reviewId));
@@ -109,6 +108,16 @@ public class ReviewService {
 
             reviewHelpfulRepository.save(helpful);
             reviewRepository.increaseHelpfulCount(reviewId);
+            return true;
         }
+    }
+
+    @Transactional
+    public void deleteReview(Long reviewId) {
+        var review = reviewRepository.findById(reviewId).orElseThrow(
+                () -> new RuntimeException("you can not delete this Review")
+        );
+        reviewHelpfulRepository.deleteByReviewId(reviewId);
+        reviewRepository.deleteById(reviewId);
     }
 }

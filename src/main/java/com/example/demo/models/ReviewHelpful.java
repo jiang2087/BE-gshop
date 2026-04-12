@@ -12,10 +12,10 @@ public class ReviewHelpful {
     private ReviewHelpfulId id;
 
     @ManyToOne
-    @MapsId("user_id")
+    @MapsId("userId")
     private User user;
 
     @ManyToOne
-    @MapsId("review_id")
+    @MapsId("reviewId")
     private Review review;
 }
