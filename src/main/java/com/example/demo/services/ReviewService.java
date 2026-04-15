@@ -11,6 +11,7 @@ import com.example.demo.repository.ReviewRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class ReviewService {
 
@@ -32,22 +34,27 @@ public class ReviewService {
         return reviewRepository.findByProductId(id);
     }
 
+    public List<Long> findLikeReviewAndProductId(Long userId, Long productId) {
+        return reviewHelpfulRepository.findLikedReviewsByUserAndProductVariant(userId, productId);
+    }
+
     @Transactional
     public ReviewResponse createReview(ReviewRequest request) {
-        Long orderId = orderRepository.findByUserIdAndProductId(request.userId(), request.productVariantId());
-        if (orderId != null) {
+        List<Long> listOrder = orderRepository.findByUserIdAndProductId(request.userId(), request.productVariantId());
+        if (listOrder != null) {
             Review review = new Review();
             review.setAvatar(request.avatar());
             review.setProductVariant(productVariantRepository.getReferenceById(request.productVariantId()));
-            review.setOrder(orderRepository.getReferenceById(orderId));
+            review.setOrder(orderRepository.getReferenceById(listOrder.getFirst()));
             review.setComment(request.comment());
             review.setHelpfulCount(0);
             review.setUser(userRepository.getReferenceById(request.userId()));
             review.setRating(request.rating());
+            review.setUsername(request.username());
             reviewRepository.save(review);
             return new ReviewResponse(
                     review.getId(),
-                    review.getUser().getUsername(),
+                    review.getUsername(),
                     review.getComment(),
                     review.getCreatedAt(),
                     review.getRating(),

@@ -47,10 +47,8 @@ public class AuthService {
                         loginRequest.username(), loginRequest.password())
         );
 
-        log.info("Authentication Successful: {}", authentication.isAuthenticated());
         SecurityContextHolder.getContext().setAuthentication(authentication);
         var userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        log.info("UserDetails: {}", userDetails);
         assert userDetails != null;
         var accessToken = jwtUtils.generateJwtAccessToken((userDetails));
         var refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername(), refreshTokenTtlSecond);

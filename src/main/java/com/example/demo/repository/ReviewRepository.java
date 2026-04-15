@@ -28,7 +28,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             FROM Review r
             JOIN r.productVariant pv
             WHERE pv.product.id = :productId
-            ORDER BY r.helpfulCount
+            ORDER BY r.helpfulCount desc
             """)
     List<ReviewResponse> findByProductId(Long productId);
 

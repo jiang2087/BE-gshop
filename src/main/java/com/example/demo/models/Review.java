@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
 @Table(
         name = "reviews",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = "order_id")
+                @UniqueConstraint(
+                        name = "unique_review",
+                        columnNames = {"user_id", "product_variant_id", "order_id"}
+                )
         },
         indexes = {
                 @Index(name = "idx_product", columnList = "product_variant_id"),

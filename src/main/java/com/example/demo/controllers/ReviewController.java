@@ -19,6 +19,11 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.getByProductId(id));
     }
 
+    @GetMapping
+    public ResponseEntity<?> getReviewUserLiked(@RequestParam Long userId, @RequestParam Long productId) {
+        return ResponseEntity.ok(reviewService.findLikeReviewAndProductId(userId, productId));
+    }
+
     @PostMapping
     public ResponseEntity<?> createReview(@RequestBody ReviewRequest review) {
         return ResponseEntity.ok(reviewService.createReview(review));
