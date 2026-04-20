@@ -9,6 +9,8 @@ import com.example.demo.utils.SkuGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +41,8 @@ public class ProductVariantService {
         }
     }
 
-    public List<ProductVariant> findAll(){
-        return productVariantRepository.findAll();
+    public Page<Product> getAllProducts(Pageable pageable){
+        return productRepository.findAll(pageable);
     }
 
     public Product getProductById(Long id){

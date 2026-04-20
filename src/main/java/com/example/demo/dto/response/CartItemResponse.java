@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 
 public record CartItemResponse(
         Long cartId,
+        Long cartItemId,
         Long productVariantId,
         String imageUrl,
         String sku,

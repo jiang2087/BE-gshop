@@ -7,6 +7,7 @@ import com.example.demo.dto.response.JwtResponse;
 import com.example.demo.dto.response.RefreshTokenPair;
 import com.example.demo.models.RefreshToken;
 import com.example.demo.repository.RefreshTokenRepository;
+import com.example.demo.services.CartService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CookieValue;
 
 import java.time.Duration;
 import java.util.List;
@@ -33,15 +35,17 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
     private final JwtUtils jwtUtils;
+    private final CartService cartService;
     private final UserDetailsServiceImpl userDetailsService;
     private final RefreshTokenRepository refreshTokenRepository;
     @Value("${hg.app.jwtExpirationSecond}")
     private Long refreshTokenTtlSecond;
 
 
-    public JwtResponse authenticateUser(LoginRequest loginRequest,  HttpServletResponse response){
+    public JwtResponse authenticateUser(LoginRequest loginRequest,
+                                        HttpServletResponse response,
+                                        String cartKey){
 
-        log.info("Authenticating User");
         var authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.username(), loginRequest.password())
@@ -49,7 +53,9 @@ public class AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         var userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        assert userDetails != null;
+        if (userDetails == null) {
+            throw new RuntimeException("User not found");
+        }
         var accessToken = jwtUtils.generateJwtAccessToken((userDetails));
         var refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername(), refreshTokenTtlSecond);
         // save refreshToken and accessToken into Cookie
@@ -75,6 +81,9 @@ public class AuthService {
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .toList();
+        if (cartKey != null && !cartKey.isBlank()) {
+            cartService.mergeCart(cartKey, userDetails.getId());
+        }
         return new JwtResponse(
                 userDetails.getId(), userDetails.getUsername(),
                 userDetails.getEmail(), userDetails.getImageUrl(), roles);

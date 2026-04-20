@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Data
 @Entity
@@ -39,4 +40,18 @@ public class CartItem {
         private Integer quantity;
 
         private LocalDateTime createdAt;
+
+        @Override
+        public boolean equals(Object o) {
+                if (this == o) return true;
+                if (!(o instanceof CartItem that)) return false;
+
+            return productVariant != null && that.productVariant != null
+                        && Objects.equals(productVariant.getId(), that.productVariant.getId());
+        }
+
+        @Override
+        public int hashCode() {
+                return Objects.hash(productVariant.getId());
+        }
 }

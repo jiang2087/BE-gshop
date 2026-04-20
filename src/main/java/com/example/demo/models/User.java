@@ -1,6 +1,6 @@
 package com.example.demo.models;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.example.demo.models.products.WishlistItem;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -57,9 +57,7 @@ public class User {
     @JsonManagedReference
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private  List<Order> order = new ArrayList<>();
-    public Optional<Address> getAddressById() {
-        return addresses.stream()
-                .filter(Address::isDefault)
-                .findFirst();
-    }
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<WishlistItem> wishlistItems = new ArrayList<>();
 }

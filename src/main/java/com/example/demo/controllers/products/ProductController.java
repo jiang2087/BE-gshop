@@ -2,6 +2,7 @@ package com.example.demo.controllers.products;
 
 import com.example.demo.services.products.ProductVariantService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,9 +13,10 @@ public class ProductController {
     private final ProductVariantService  productVariantService;
 
     @GetMapping
-    public ResponseEntity<?> getAllProducts(){
-        return ResponseEntity.ok(productVariantService.findAll());
+    public ResponseEntity<?> getAllProducts(Pageable pageable){
+        return ResponseEntity.ok(productVariantService.getAllProducts(pageable));
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getProductById(@PathVariable long id){

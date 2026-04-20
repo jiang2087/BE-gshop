@@ -27,6 +27,7 @@ public abstract class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String brand;
+    private String thumbnail;
     private String name;
     @Column(columnDefinition = "TEXT")
     private String description;

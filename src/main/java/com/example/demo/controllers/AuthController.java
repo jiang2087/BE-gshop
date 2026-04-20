@@ -40,8 +40,10 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest, HttpServletResponse responseHttp){
-        JwtResponse response = authService.authenticateUser(loginRequest, responseHttp);
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
+                                              HttpServletResponse responseHttp,
+                                              @CookieValue(value = "cartKey", required = false) String cartKey){
+        JwtResponse response = authService.authenticateUser(loginRequest, responseHttp, cartKey);
         return ResponseEntity.ok(response);
     }
 

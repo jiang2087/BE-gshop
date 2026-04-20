@@ -17,6 +17,10 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
+@Table(indexes = {
+        @Index(name = "idx_product_price", columnList = "product_id, price"),
+        @Index(name = "idx_product_stock", columnList = "product_id, stock_quantity")
+})
 public class ProductVariant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,7 +31,7 @@ public class ProductVariant {
     Color color;
 
     @JsonBackReference
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     Product product;
 
@@ -43,6 +47,12 @@ public class ProductVariant {
     @Min(0)
     @Column(nullable = false)
     private Integer stockQuantity;
+
+    @Column(nullable = false)
+    private Boolean isDefault = false;
+
+    @Column(nullable = false)
+    private Boolean active = true;
 
     @Version
     private Integer version;
