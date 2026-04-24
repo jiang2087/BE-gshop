@@ -8,10 +8,17 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
     @NonNull Page<Product> findAll(@NonNull Pageable pageable);
 
-    Page<Product> findById(String name, Pageable pageable);
+    @Query("""
+    SELECT p.name FROM Product p WHERE p.id in :ids
+""")
+    List<String> findByIds(@Param("ids") List<Long> ids);
+
 
     @Query(
             value = "SELECT * FROM product WHERE product_type = :type",

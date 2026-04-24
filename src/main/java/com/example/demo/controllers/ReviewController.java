@@ -4,8 +4,11 @@ package com.example.demo.controllers;
 import com.example.demo.dto.request.ReviewRequest;
 import com.example.demo.services.ReviewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,6 +25,16 @@ public class ReviewController {
     @GetMapping
     public ResponseEntity<?> getReviewUserLiked(@RequestParam Long userId, @RequestParam Long productId) {
         return ResponseEntity.ok(reviewService.findLikeReviewAndProductId(userId, productId));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<?> getReviewStats(@RequestParam List<Long> productIds) {
+        return ResponseEntity.ok(reviewService.getReviewStats(productIds));
+    }
+
+    @GetMapping("/top")
+    public ResponseEntity<?> getTopReviews(Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getTopReview(pageable));
     }
 
     @PostMapping

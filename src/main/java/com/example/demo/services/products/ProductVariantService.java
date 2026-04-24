@@ -1,8 +1,10 @@
 package com.example.demo.services.products;
 
+import com.example.demo.dto.response.ReviewStats;
 import com.example.demo.models.Color;
 import com.example.demo.models.Product;
 import com.example.demo.models.products.ProductVariant;
+import com.example.demo.repository.ReviewRepository;
 import com.example.demo.repository.products.ProductRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
 import com.example.demo.utils.SkuGenerator;
@@ -16,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +45,12 @@ public class ProductVariantService {
         }
     }
 
-    public Page<Product> getAllProducts(Pageable pageable){
-        return productRepository.findAll(pageable);
+    public Page<?> getAllProducts(Pageable pageable){
+            return productRepository.findAll(pageable);
+    }
+
+    public List<String> getNameByIds(List<Long> ids){
+        return productRepository.findByIds(ids);
     }
 
     public Product getProductById(Long id){

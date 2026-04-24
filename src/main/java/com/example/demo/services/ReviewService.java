@@ -2,6 +2,7 @@ package com.example.demo.services;
 
 import com.example.demo.dto.request.ReviewRequest;
 import com.example.demo.dto.response.ReviewResponse;
+import com.example.demo.dto.response.ReviewStats;
 import com.example.demo.models.Review;
 import com.example.demo.models.ReviewHelpful;
 import com.example.demo.models.junction.ReviewHelpfulId;
@@ -11,7 +12,7 @@ import com.example.demo.repository.ReviewRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +21,6 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 @Transactional(readOnly = true)
 public class ReviewService {
 
@@ -38,10 +38,18 @@ public class ReviewService {
         return reviewHelpfulRepository.findLikedReviewsByUserAndProductVariant(userId, productId);
     }
 
+    public List<ReviewResponse> getTopReview(Pageable pageable) {
+        return reviewRepository.findTopReviews(pageable);
+    }
+
+    public List<ReviewStats> getReviewStats(List<Long> productIds) {
+        return reviewRepository.getReviewStats(productIds);
+    }
+
     @Transactional
     public ReviewResponse createReview(ReviewRequest request) {
         List<Long> listOrder = orderRepository.findByUserIdAndProductId(request.userId(), request.productVariantId());
-        if (listOrder != null) {
+        if (listOrder.getFirst() != null) {
             Review review = new Review();
             review.setAvatar(request.avatar());
             review.setProductVariant(productVariantRepository.getReferenceById(request.productVariantId()));

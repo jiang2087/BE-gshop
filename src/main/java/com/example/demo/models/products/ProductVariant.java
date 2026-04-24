@@ -1,7 +1,6 @@
 package com.example.demo.models.products;
 
 import com.example.demo.models.Color;
-import com.example.demo.models.Order;
 import com.example.demo.models.Product;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
