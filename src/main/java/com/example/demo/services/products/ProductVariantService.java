@@ -1,10 +1,9 @@
 package com.example.demo.services.products;
 
-import com.example.demo.dto.response.ReviewStats;
+import com.example.demo.Enums.ProductType;
 import com.example.demo.models.Color;
 import com.example.demo.models.Product;
 import com.example.demo.models.products.ProductVariant;
-import com.example.demo.repository.ReviewRepository;
 import com.example.demo.repository.products.ProductRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
 import com.example.demo.utils.SkuGenerator;
@@ -18,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -57,4 +54,10 @@ public class ProductVariantService {
         return productRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("product not found"));
     }
+
+    public Page<Product> getProductByType(String type, Pageable pageable){
+        var clazz = ProductType.valueOf(type).getClazz();
+        return productRepository.findByType(clazz, pageable);
+    }
+
 }

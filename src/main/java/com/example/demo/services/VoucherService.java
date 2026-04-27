@@ -9,10 +9,13 @@ import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.UserVoucherRepository;
 import com.example.demo.repository.VoucherRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Service
@@ -42,6 +45,17 @@ public class VoucherService {
         return voucherRepository.save(v);
     }
 
+    public List<Voucher> getVoucher() {
+        return voucherRepository.findAll();
+    }
+
+    public List<Voucher> getTop5VoucherByUser(Long userId){
+        Pageable pageable = PageRequest.of(0, 5);
+        return voucherRepository.findTopAvailableVouchers(userId, pageable);
+    }
+
+
+    @Transactional
     public void collectVoucher(Long userId, String code) {
         Voucher voucher = voucherRepository.findByCode(code)
                 .orElseThrow(() -> new RuntimeException("Voucher not found"));
@@ -119,7 +133,6 @@ public class VoucherService {
                 break;
 
             case PRODUCT_DISCOUNT:
-                // xử lý riêng nếu cần
                 discountAmount = voucher.getValue();
                 break;
         }

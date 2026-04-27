@@ -20,13 +20,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<String> findByIds(@Param("ids") List<Long> ids);
 
 
-    @Query(
-            value = "SELECT * FROM product WHERE product_type = :type",
-            countQuery = "SELECT COUNT(*) FROM product WHERE product_type = :type",
-            nativeQuery = true
-    )
-    Page<Product> findByType(
-            @Param("type") String type,
-            Pageable pageable
-    );
+    @Query("SELECT p FROM Product p WHERE TYPE(p) = :type")
+    Page<Product> findByType(@Param("type") Class<? extends Product> type, Pageable pageable);
 }

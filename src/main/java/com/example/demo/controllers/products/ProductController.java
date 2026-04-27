@@ -28,4 +28,9 @@ public class ProductController {
     public ResponseEntity<?> getProductById(@PathVariable long id){
         return ResponseEntity.ok(productVariantService.getProductById(id));
     }
+
+    @GetMapping("/type/{type}")
+    public ResponseEntity<?> getProductByType(@PathVariable String type, Pageable pageable){
+        return ResponseEntity.ok(productVariantService.getProductByType(type, pageable));
+    }
 }
