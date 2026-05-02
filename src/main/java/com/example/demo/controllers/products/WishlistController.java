@@ -1,6 +1,5 @@
 package com.example.demo.controllers.products;
 
-import com.example.demo.models.products.ProductVariant;
 import com.example.demo.services.products.WishlistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,13 +20,13 @@ public class WishlistController {
 
     @PostMapping
     public ResponseEntity<?> addWishlist(@RequestParam Long userId,
-                                         @RequestParam Long productId){
-        return ResponseEntity.ok(wishlistService.addWishlistItem(userId,productId));
+                                         @RequestParam Long productVariantId){
+        return ResponseEntity.ok(wishlistService.addWishlistItem(userId,productVariantId));
     }
 
     @DeleteMapping
-    public ResponseEntity<?> deleteWishlist(@RequestParam Long userId, @RequestParam Long productId) {
-        wishlistService.deleteWishlistItem(userId,productId);
+    public ResponseEntity<?> deleteWishlist(@RequestParam Long userId, @RequestParam Long productVariantId) {
+        wishlistService.deleteWishlistItem(userId,productVariantId);
         return ResponseEntity.ok().build();
     }
 }

@@ -23,6 +23,7 @@ public class OrderItem {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "order_id")
     @JsonBackReference
     private Order order;
 

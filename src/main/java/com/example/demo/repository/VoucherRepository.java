@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,7 +13,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface VoucherRepository extends JpaRepository<Voucher, Long> {
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Voucher> findByCode(String code);
     @Query("""
     SELECT v FROM Voucher v
@@ -27,5 +27,14 @@ public interface VoucherRepository extends JpaRepository<Voucher, Long> {
       )
     ORDER BY v.value DESC
 """)
+
     List<Voucher> findTopAvailableVouchers(@Param("userId") Long userId, Pageable pageable);
+    @Modifying
+    @Query("""
+    UPDATE Voucher v
+    SET v.usedCount = v.usedCount + 1
+    WHERE v.code = :code
+    AND v.usedCount < v.quantity
+""")
+    int incrementUsage(@Param("code") String code);
 }

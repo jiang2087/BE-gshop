@@ -53,6 +53,27 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     List<CartItemResponse> getCartItemsByCartId(@Param("cartId") Long cartId);
 
     @Query("""
+    SELECT new com.example.demo.dto.response.CartItemResponse(
+        c.id,
+        ci.id,
+        pv.id,
+        pv.image,
+        pv.sku,
+        co.hexCode,
+        co.name,
+        ci.price,
+        ci.quantity,
+        c.cartKey
+    )
+    FROM CartItem ci
+    JOIN ci.cart c
+    JOIN ci.productVariant pv
+    JOIN pv.color co
+    WHERE c.user.id = :userId
+""")
+    List<CartItemResponse> getCartItemsByUserId(@Param("userId") Long userId);
+
+    @Query("""
     SELECT SUM(ci.price * ci.quantity)
     FROM CartItem ci
     WHERE ci.cart.id = :cartId

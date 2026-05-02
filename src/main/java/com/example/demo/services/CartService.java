@@ -79,8 +79,8 @@ public class CartService {
         );
     }
 
-    public List<CartItemResponse> getCartItems(Long cartId) {
-        return cartItemRepository.getCartItemsByCartId(cartId);
+    public List<CartItemResponse> getCartItems(Long userId) {
+        return cartItemRepository.getCartItemsByUserId(userId);
     }
 
     @Transactional

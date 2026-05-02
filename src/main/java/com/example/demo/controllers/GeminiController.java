@@ -15,6 +15,7 @@ public class GeminiController {
 
     private final GeminiService geminiService;
 
+
     @GetMapping
     public String response(@RequestBody String message){
         return geminiService.ask(message);

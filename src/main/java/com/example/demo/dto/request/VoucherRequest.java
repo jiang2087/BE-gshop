@@ -3,6 +3,8 @@ package com.example.demo.dto.request;
 import com.example.demo.Enums.DiscountType;
 import com.example.demo.Enums.VoucherType;
 import jakarta.validation.constraints.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record VoucherRequest(
@@ -18,11 +20,11 @@ public record VoucherRequest(
 
     @NotNull
     @Positive
-    Double value,
+    BigDecimal value,
 
-    Double minOrderValue,
+    BigDecimal minOrderValue,
 
-    Double maxDiscount,
+    BigDecimal maxDiscount,
 
     @NotNull
     @Positive

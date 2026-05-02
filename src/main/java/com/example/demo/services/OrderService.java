@@ -9,6 +9,7 @@ import com.example.demo.models.User;
 import com.example.demo.models.products.OrderItem;
 import com.example.demo.models.products.ProductVariant;
 import com.example.demo.repository.AddressRepository;
+import com.example.demo.repository.CartRepository;
 import com.example.demo.repository.OrderRepository;
 
 import com.example.demo.repository.UserRepository;
@@ -16,6 +17,7 @@ import com.example.demo.repository.products.ProductVariantRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,88 +40,93 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final VoucherService voucherService;
+    private final CartRepository cartRepository;
 
     @Transactional
-    public Order placeOrder(PlaceOrderRequest request){
+    public Order placeOrder(PlaceOrderRequest request) {
+        try {
+            // 1. Validate user
+            User user = userRepository.findById(request.userId())
+                    .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
+            // 2. Validate address of user
+            Address address = addressRepository.findByIdAndUserId(request.addressId(), request.userId())
+                    .orElseThrow(() -> new EntityNotFoundException("Address not found"));
 
-        // 1. Validate user
-        User user = userRepository.findById(request.userId())
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+            // 3. create Order
+            Order order = new Order();
+            order.setUser(user);
+            order.setShippingAddress(AddressSnapShot.from(address)); // snapshot địa chỉ
+            order.setPaymentMethod(request.paymentMethod() != null ? request.paymentMethod() : "COD");
+            order.setNote(request.note() != null ? request.note() : "");
+            order.setStatus(OrderStatus.PENDING);
+            order.setShippingFee(BigDecimal.ZERO);
+            order.setDiscountAmount(BigDecimal.ZERO);
 
-        // 2. Validate địa chỉ thuộc user
-        Address address = addressRepository.findById(request.addressId())
-                .orElseThrow(() -> new EntityNotFoundException("Address not found"));
-        // 3. Tạo Order
-        Order order = new Order();
-        order.setUser(user);
-        order.setShippingAddress(AddressSnapShot.from(address)); // snapshot địa chỉ
-        order.setPaymentMethod(request.paymentMethod() != null ? request.paymentMethod() : "COD");
-        order.setNote(request.note() != null ? request.note() : "");
-        order.setStatus(OrderStatus.PENDING);
-        order.setShippingFee(BigDecimal.ZERO);
-        order.setDiscountAmount(BigDecimal.ZERO);
+            // 4. handle items + check stock + checkout
+            BigDecimal subtotal = BigDecimal.ZERO;
 
-        // 4. Xử lý items + kiểm tra stock + tính tiền
-        BigDecimal subtotal = BigDecimal.ZERO;
+            List<Long> variantIds = request.items().stream()
+                    .map(PlaceOrderRequest.OrderItemRequest::variantId)
+                    .toList();
+            // Just one query to retrieve all variants and products.
+            List<ProductVariant> variants = productVariantRepository
+                    .findAllWithProductByIdIn(variantIds);
 
-        List<Long> variantIds = request.items().stream()
-                .map(PlaceOrderRequest.OrderItemRequest::variantId)
-                .toList();
-        // Chỉ 1 query lấy tất cả variant + product
-        List<ProductVariant> variants = productVariantRepository
-                .findAllWithProductByIdIn(variantIds);
+            //Create a map for quick searching by ID)
+            Map<Long, ProductVariant> variantMap = variants.stream()
+                    .collect(Collectors.toMap(ProductVariant::getId, v -> v));
+            for (PlaceOrderRequest.OrderItemRequest itemReq : request.items()) {
+                ProductVariant variant = variantMap.get(itemReq.variantId());
 
-        // Tạo Map để tra cứu nhanh theo id (performance tốt)
-        Map<Long, ProductVariant> variantMap = variants.stream()
-                .collect(Collectors.toMap(ProductVariant::getId, v -> v));
-        for (PlaceOrderRequest.OrderItemRequest itemReq : request.items()) {
-            ProductVariant variant = variantMap.get(itemReq.variantId());
+                if (variant == null) {
+                    throw new EntityNotFoundException("can not find a variant has id: " + itemReq.variantId());
+                }
 
-            if (variant == null) {
-                throw new EntityNotFoundException("Không tìm thấy biến thể sản phẩm: " + itemReq.variantId());
+                // check stock
+                if (variant.getStockQuantity() < itemReq.quantity()) {
+                    throw new IllegalStateException(
+                            String.format("Không đủ hàng cho sản phẩm %s (SKU: %s). Còn: %d, yêu cầu: %d",
+                                    variant.getProduct().getName(),
+                                    variant.getSku(),
+                                    variant.getStockQuantity(),
+                                    itemReq.quantity()));
+                }
+
+                // create OrderItem
+                OrderItem orderItem = new OrderItem();
+                orderItem.setProductVariant(variant);
+                orderItem.setQuantity(itemReq.quantity());
+                orderItem.setPrice(variant.getPrice());   // snapshot price
+
+                order.addItem(orderItem);
+
+                // decrease stock
+                variant.setStockQuantity(variant.getStockQuantity() - itemReq.quantity());
+
+                // subtotal
+                subtotal = subtotal.add(
+                        variant.getPrice().multiply(BigDecimal.valueOf(itemReq.quantity()))
+                );
             }
 
-            // Kiểm tra tồn kho
-            if (variant.getStockQuantity() < itemReq.quantity()) {
-                throw new IllegalStateException(
-                        String.format("Không đủ hàng cho sản phẩm %s (SKU: %s). Còn: %d, yêu cầu: %d",
-                                variant.getProduct().getName(),
-                                variant.getSku(),
-                                variant.getStockQuantity(),
-                                itemReq.quantity()));
+            // 5. handle voucher
+            BigDecimal discount = BigDecimal.ZERO;
+            if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
+                discount = voucherService.applyVoucher(request.voucherCode(), request.userId(), subtotal);
             }
+            order.setDiscountAmount(discount);
 
-            // Tạo OrderItem
-            OrderItem orderItem = new OrderItem();
-            orderItem.setProductVariant(variant);
-            orderItem.setQuantity(itemReq.quantity());
-            orderItem.setPrice(variant.getPrice());   // snapshot giá
-
-            order.addItem(orderItem);
-
-            // Giảm tồn kho
-            variant.setStockQuantity(variant.getStockQuantity() - itemReq.quantity());
-
-            // Tích lũy subtotal
-            subtotal = subtotal.add(
-                    variant.getPrice().multiply(BigDecimal.valueOf(itemReq.quantity()))
-            );
+            //finalTotal =  subtotal - discount + shippingFee (default value is 1.2 dollars)
+            BigDecimal finalTotal = subtotal.subtract(discount).add(BigDecimal.valueOf(1.2));
+            order.setTotalPrice(finalTotal);
+            order.setOrderCode(generateOrderCode());
+            cartRepository.deleteByUserId(user.getId());
+            return orderRepository.save(order);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new IllegalStateException("The product has just been changed, please try again");
         }
-
-          // 5. Xử lý voucher
-//        BigDecimal discount = BigDecimal.ZERO;
-//        if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
-//            discount = voucherService.applyVoucher(request.voucherCode(), subtotal, user);
-//        }
-//        order.setDiscountAmount(discount);
-
-        // 6. Tính tổng
-        order.setOrderCode(generateOrderCode());
-        BigDecimal finalTotal = order.calculateTotal(); // subtotal - discount + shippingFee
-        order.setTotalPrice(finalTotal);
-
-        return orderRepository.save(order);
     }
 
 

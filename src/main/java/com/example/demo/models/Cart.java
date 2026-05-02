@@ -3,10 +3,7 @@ package com.example.demo.models;
 
 import com.example.demo.Enums.CartStatus;
 import com.example.demo.models.products.CartItem;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;

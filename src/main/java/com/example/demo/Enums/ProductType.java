@@ -10,7 +10,7 @@ import lombok.Getter;
 @Getter
 public enum ProductType {
     LAPTOP(Laptop.class),
-    WATCH(Watches.class),
+    WATCHES(Watches.class),
     MOBILE(Mobile.class),
     TELEVISION(Television.class);
 

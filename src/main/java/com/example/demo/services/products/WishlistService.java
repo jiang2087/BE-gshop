@@ -4,6 +4,7 @@ import com.example.demo.dto.response.WishlistResponse;
 import com.example.demo.models.products.WishlistItem;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.products.ProductRepository;
+import com.example.demo.repository.products.ProductVariantRepository;
 import com.example.demo.repository.products.WishlistRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,8 +19,7 @@ public class WishlistService {
 
     private final WishlistRepository wishlistRepository;
     private final UserRepository userRepository;
-    private final ProductRepository productRepository;
-
+    private final ProductVariantRepository productVariantRepository;
     public List<WishlistResponse> getWishlist(Long userId) {
         return  wishlistRepository.findByUserId(userId);
     }
@@ -27,14 +27,14 @@ public class WishlistService {
     @Transactional
     public String addWishlistItem(Long userId, Long productId) {
 
-        boolean exists = wishlistRepository.existsByUserIdAndProductId(userId, productId);
+        boolean exists = wishlistRepository.existsByUserIdAndProductVariantId(userId, productId);
         if (exists) {
             throw new RuntimeException("Product already in wishlist");
         }
 
         WishlistItem item = new WishlistItem();
         item.setUser(userRepository.getReferenceById(userId));
-        item.setProduct(productRepository.getReferenceById(productId));
+        item.setProductVariant(productVariantRepository.getReferenceById(productId));
 
         wishlistRepository.save(item);
         return "Wishlist added";
@@ -42,6 +42,6 @@ public class WishlistService {
 
     @Transactional
     public void deleteWishlistItem(Long userId, Long productId) {
-        wishlistRepository.deleteByUserIdAndProductId(userId, productId);
+        wishlistRepository.deleteByUserIdAndProductVariantId(userId, productId);
     }
 }

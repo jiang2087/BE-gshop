@@ -20,16 +20,13 @@ public record PlaceOrderRequest(
         @Size(min = 1, max = 50, message = "Maximum 50 items per order")
         List<@Valid OrderItemRequest> items,
 
-        // Không nên để client gửi totalPrice → server sẽ tính lại
-        // Nếu vẫn muốn client gửi để kiểm tra UI, thì dùng field riêng (estimatedTotal)
-
         String paymentMethod,       // "COD", "VNPAY", "MOMO", "BANK_CARD"
 
-        String note,                // ghi chú
+        String note,
 
-        String voucherCode,          // mã voucher
+        String voucherCode,
 
-        Integer shippingFee          // phí ship
+        Integer shippingFee
 
 ) {
     // Nested record

@@ -1,19 +1,24 @@
 package com.example.demo.services;
 
 import com.example.demo.Enums.DiscountType;
+import com.example.demo.Enums.VoucherErrorCode;
 import com.example.demo.dto.request.VoucherRequest;
+import com.example.demo.exceptions.VoucherException;
 import com.example.demo.models.User;
 import com.example.demo.models.Voucher;
 import com.example.demo.models.junction.UserVoucher;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.UserVoucherRepository;
 import com.example.demo.repository.VoucherRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.ErrorResponseException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,6 +31,7 @@ public class VoucherService {
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
     private final UserRepository userRepository;
+    private static  final BigDecimal shippingFee = BigDecimal.valueOf(1.2);
 
     @Transactional
     public Voucher createVoucher(VoucherRequest request) {
@@ -77,7 +83,7 @@ public class VoucherService {
     }
 
     @Transactional
-    public Double applyVoucher(String code, Long userId, Double orderTotal, Double shippingFee) {
+    public BigDecimal applyVoucher(String code, Long userId, BigDecimal orderTotal) {
 
         Voucher voucher = voucherRepository.findByCode(code)
                 .orElseThrow(() -> new RuntimeException("Voucher not found"));
@@ -93,8 +99,8 @@ public class VoucherService {
             throw new RuntimeException("Voucher out of stock");
         }
 
-        if (orderTotal < voucher.getMinOrderValue()) {
-            throw new RuntimeException("Not enough order value");
+        if (orderTotal.compareTo(voucher.getMinOrderValue()) < 0) {
+            throw new VoucherException(VoucherErrorCode.MIN_NOT_MET);
         }
 
         UserVoucher uv = userVoucherRepository
@@ -104,42 +110,112 @@ public class VoucherService {
         if (uv.getUsed()) {
             throw new RuntimeException("Voucher already used");
         }
+        int updated = voucherRepository.incrementUsage(code);
 
-        double discountAmount = getDiscountAmount(orderTotal, shippingFee, voucher);
+        if (updated == 0) {
+            throw new RuntimeException("Voucher out of stock");
+        }
+
+        BigDecimal discountAmount = getDiscountAmount(orderTotal, voucher);
 
         // update usage
         uv.setUsed(true);
         uv.setUsedAt(now);
 
-        voucher.setUsedCount(voucher.getUsedCount() + 1);
-
         return discountAmount;
     }
 
-    private static double getDiscountAmount(Double orderTotal, Double shippingFee, Voucher voucher) {
-        double discountAmount = 0;
+    public BigDecimal previewVoucher(String code, Long userId, BigDecimal orderTotal) {
+
+        Voucher voucher1 = validateVoucher(code, userId, orderTotal);
+
+        return getDiscountAmount(orderTotal, voucher1);
+    }
+
+    private Voucher validateVoucher(String code, Long userId, BigDecimal orderTotal) {
+
+        Voucher voucher = voucherRepository.findByCode(code)
+                .orElseThrow(() -> new VoucherException(VoucherErrorCode.NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(voucher.getActive())) {
+            throw new VoucherException(VoucherErrorCode.INACTIVE);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (now.isBefore(voucher.getStartDate()) || now.isAfter(voucher.getEndDate())) {
+            throw new VoucherException(VoucherErrorCode.EXPIRED);
+        }
+
+        if (voucher.getUsedCount() >= voucher.getQuantity()) {
+            throw new VoucherException(VoucherErrorCode.OUT_OF_STOCK);
+        }
+
+        if (orderTotal.compareTo(voucher.getMinOrderValue()) < 0) {
+            throw new VoucherException(VoucherErrorCode.MIN_NOT_MET);
+        }
+
+        UserVoucher uv = userVoucherRepository
+                .findByUserIdAndVoucherCode(userId, code)
+                .orElseThrow(() -> new VoucherException(VoucherErrorCode.NOT_OWNED));
+
+        if (Boolean.TRUE.equals(uv.getUsed())) {
+            throw new VoucherException(VoucherErrorCode.ALREADY_USED);
+        }
+
+        return voucher;
+    }
+
+    private static BigDecimal getDiscountAmount(
+            BigDecimal orderTotal,
+            Voucher voucher
+    ) {
+
+        BigDecimal discount = BigDecimal.ZERO;
+
+        if (voucher == null) return discount;
 
         switch (voucher.getType()) {
+
             case FREE_SHIP:
-                discountAmount = shippingFee;
+                discount = shippingFee;
                 break;
 
             case ORDER_DISCOUNT:
                 if (voucher.getDiscountType() == DiscountType.PERCENTAGE) {
-                    discountAmount = orderTotal * voucher.getValue() / 100;
+                    discount = orderTotal
+                            .multiply(safe(voucher.getValue()))
+                            .divide(BigDecimal.valueOf(100));
                 } else {
-                    discountAmount = voucher.getValue();
+                    discount = safe(voucher.getValue());
                 }
                 break;
 
             case PRODUCT_DISCOUNT:
-                discountAmount = voucher.getValue();
+                discount = safe(voucher.getValue());
                 break;
+
+            default:
+                throw new VoucherException(VoucherErrorCode.INVALID_TYPE);
         }
 
+        // apply max discount
         if (voucher.getMaxDiscount() != null) {
-            discountAmount = Math.min(discountAmount, voucher.getMaxDiscount());
+            discount = discount.min((voucher.getMaxDiscount()));
         }
-        return discountAmount;
+
+        // ensure discount does not exceed total order amount (order + shipping)
+        BigDecimal maxAllowed = orderTotal.add(safe(shippingFee));
+        discount = discount.min(maxAllowed);
+
+        // prevent negative discount
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            discount = BigDecimal.ZERO;
+        }
+
+        return discount;
+    }
+    private static BigDecimal safe(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

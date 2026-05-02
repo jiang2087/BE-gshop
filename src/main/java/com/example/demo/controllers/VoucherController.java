@@ -5,9 +5,11 @@ import com.example.demo.models.Voucher;
 import com.example.demo.services.VoucherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import okhttp3.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -25,6 +27,15 @@ public class VoucherController {
     @GetMapping("/top-5/{userId}")
     public ResponseEntity<List<Voucher>> getTop5Voucher(@PathVariable Long userId) {
         return ResponseEntity.ok(voucherService.getTop5VoucherByUser(userId));
+    }
+
+    @GetMapping("/preview")
+    public ResponseEntity<?> getPreviewVoucher(
+            @RequestParam String code,
+            @RequestParam Long userId,
+            @RequestParam BigDecimal orderTotal
+            ) {
+        return ResponseEntity.ok(voucherService.previewVoucher(code, userId, orderTotal));
     }
 
     @PostMapping
@@ -45,10 +56,11 @@ public class VoucherController {
     public ResponseEntity<?> applyVoucher(
             @RequestParam Long userId,
             @RequestParam String code,
-            @RequestParam Double orderTotal,
-            @RequestParam Double shippingFee
+            @RequestParam BigDecimal orderTotal
     ) {
-        Double discount = voucherService.applyVoucher(code, userId, orderTotal, shippingFee);
+        var discount = voucherService.applyVoucher(code, userId, orderTotal);
         return ResponseEntity.ok(discount);
     }
+
+
 }

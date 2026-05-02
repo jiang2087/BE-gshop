@@ -5,17 +5,23 @@ import com.example.demo.Enums.VoucherType;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Data
-@Table(name = "vouchers")
+@Table(name = "vouchers",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_voucher_code", columnNames = "code")
+        }
+)
 public class Voucher {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, nullable = false)
     private String code;
 
     @Enumerated(EnumType.STRING)
@@ -24,11 +30,14 @@ public class Voucher {
     @Enumerated(EnumType.STRING)
     private DiscountType discountType;
 
-    private Double value;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal value;
 
-    private Double minOrderValue;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal minOrderValue;
 
-    private Double maxDiscount;
+    @Column(precision = 10, scale = 2)
+    private BigDecimal maxDiscount;
 
     private Integer quantity;
 

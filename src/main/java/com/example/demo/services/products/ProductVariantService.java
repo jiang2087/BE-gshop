@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -55,9 +58,45 @@ public class ProductVariantService {
                 .orElseThrow(() -> new EntityNotFoundException("product not found"));
     }
 
-    public Page<Product> getProductByType(String type, Pageable pageable){
-        var clazz = ProductType.valueOf(type).getClazz();
+    public Page<Product> getProductByType(List<String> types, Pageable pageable){
+        var clazz = types.stream()
+                .map(type -> ProductType.valueOf(type).getClazz())
+                .toList();
         return productRepository.findByType(clazz, pageable);
+    }
+
+    public Map<String, Long> countProductsByType(List<String> types) {
+        var clazz = types.stream()
+                .map(type -> ProductType.valueOf(type).getClazz())
+                .toList();
+
+        var result = productRepository.countByType(clazz);
+
+        return result.stream().collect(Collectors.toMap(
+                r -> ((Class<?>) r[0]).getSimpleName(),
+                r -> (Long) r[1]
+        ));
+    }
+
+    public Page<Product> getProductsByPriceRange(List<String> types,BigDecimal min, BigDecimal max, Pageable pageable) {
+        if (min.compareTo(BigDecimal.ZERO) < 0 || max.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Price values must be non-negative");
+        }
+        if (min.compareTo(max) > 0) {
+            throw new IllegalArgumentException("min price must be <= max price");
+        }
+
+        List<String> safeTypes = Optional.ofNullable(types).orElse(List.of());
+
+        if (safeTypes.isEmpty()) {
+            return productRepository.findByPriceRange(min, max, pageable);
+        }
+
+        var clazz = safeTypes.stream()
+                .map(type -> ProductType.valueOf(type).getClazz())
+                .toList();
+
+        return productRepository.findByCategoryAndPriceRange(clazz, min, max, pageable);
     }
 
 }
