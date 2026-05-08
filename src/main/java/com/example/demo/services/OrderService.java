@@ -2,6 +2,7 @@ package com.example.demo.services;
 
 import com.example.demo.Enums.OrderStatus;
 import com.example.demo.dto.request.PlaceOrderRequest;
+import com.example.demo.dto.response.OrderAdminResponse;
 import com.example.demo.models.Address;
 import com.example.demo.models.junction.AddressSnapShot;
 import com.example.demo.models.Order;
@@ -18,15 +19,17 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.time.temporal.TemporalAdjusters;
 import java.util.stream.Collectors;
 
 
@@ -42,6 +45,7 @@ public class OrderService {
     private final ProductVariantRepository productVariantRepository;
     private final VoucherService voucherService;
     private final CartRepository cartRepository;
+    private final DateTimeService dateTimeService;
 
     @Transactional
     public Order placeOrder(PlaceOrderRequest request) {
@@ -111,6 +115,10 @@ public class OrderService {
                 );
             }
 
+            String note = request.note() != null ? request.note() : "";
+            order.setNote(note);
+            order.setShippingFee(BigDecimal.valueOf(1.2));
+
             // 5. handle voucher
             BigDecimal discount = BigDecimal.ZERO;
             if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
@@ -150,6 +158,108 @@ public class OrderService {
             sb.append(chars.charAt(random.nextInt(chars.length())));
         }
         return sb.toString();
+    }
+
+    public BigDecimal getProfitThisMonth() {
+        LocalDateTime startOfMonth = dateTimeService.getStartOfMonth();
+        LocalDateTime startOfNextMonth = dateTimeService.getStartOfNextMonth();
+        return orderRepository.getTotalProfitThisMonth(startOfMonth, startOfNextMonth);
+    }
+
+
+    public Map<Integer, BigDecimal> getProfitPerMonth() {
+        int year = LocalDate.now().getYear();
+        List<Object[]> rows = orderRepository.getProfitPerMonth(year);
+
+        Map<Integer, BigDecimal> profitByMonth = new LinkedHashMap<>();
+        for (int month = 1; month <= 12; month++) {
+            profitByMonth.put(month, BigDecimal.ZERO);
+        }
+
+        for (Object[] row : rows) {
+            Integer month = (Integer) row[0];
+            BigDecimal total = (BigDecimal) row[1];
+            profitByMonth.put(month, total);
+        }
+
+        return profitByMonth;
+    }
+
+    public Map<Integer, BigDecimal> getProfitPerWeek() {
+        int year = LocalDate.now().getYear();
+        List<Object[]> rows = orderRepository.getProfitPerWeek(year);
+
+        Map<Integer, BigDecimal> profitByWeek = new LinkedHashMap<>();
+        for (int week = 1; week <= 53; week++) {
+            profitByWeek.put(week, BigDecimal.ZERO);
+        }
+
+        for (Object[] row : rows) {
+            Integer week = (Integer) row[0];
+            BigDecimal total = (BigDecimal) row[1];
+            profitByWeek.put(week, total);
+        }
+
+        return profitByWeek;
+    }
+
+
+    public List<Map<String, Object>> getRevenueByDayOfWeek(String timeFrame) {
+        LocalDate week;
+        if("last week".equalsIgnoreCase(timeFrame)){
+            week = LocalDate.now().minusWeeks(1);
+        }else{
+            week = LocalDate.now();
+        }
+
+        List<Object[]> rawData = orderRepository.getRevenueByDayOfWeek(week);
+
+        Map<Integer, Double> map = new HashMap<>();
+        for (Object[] row : rawData) {
+            Integer day = ((Number) row[0]).intValue();
+            Double total = ((Number) row[1]).doubleValue();
+            map.put(day, total);
+        }
+
+        List<Integer> order = List.of(2,3,4,5,6,7,1);
+
+        Map<Integer, String> dayMap = Map.of(
+                1, "Sun",
+                2, "Mon",
+                3, "Tue",
+                4, "Wed",
+                5, "Thu",
+                6, "Fri",
+                7, "Sat"
+        );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Integer d : order) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("x", dayMap.get(d)); // cho chart
+            item.put("y", map.getOrDefault(d, 0.0));
+
+            result.add(item);
+        }
+
+        return result;
+    }
+
+    public List<OrderAdminResponse> getAllOrder() {
+        return orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+                .stream()
+                .map(order -> new OrderAdminResponse(
+                        order.getId(),
+                        order.getOrderCode(),
+                        order.getShippingAddress() != null ? order.getShippingAddress().getRecipientName() : null,
+                        order.getShippingAddress() != null ? order.getShippingAddress().getPhone() : null,
+                        order.getTotalPrice(),
+                        order.getPaymentMethod(),
+                        order.getStatus(),
+                        order.getCreatedAt()
+                ))
+                .toList();
     }
 
 }

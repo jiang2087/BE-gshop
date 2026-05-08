@@ -29,7 +29,7 @@ public class Cart {
     @Column(unique = true)
     private String cartKey;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cart",cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CartItem> items = new ArrayList<>();
 
     private LocalDateTime createdAt;
@@ -43,5 +43,17 @@ public class Cart {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    public void addItem(CartItem item) {
+        items.add(item);
+        item.setCart(this);
+    }
+
+    public void clearItems() {
+        for (CartItem item : items) {
+            item.setCart(null);
+        }
+        items.clear();
     }
 }

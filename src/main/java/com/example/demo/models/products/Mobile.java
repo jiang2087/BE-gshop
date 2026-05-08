@@ -14,7 +14,7 @@ import lombok.Setter;
 @DiscriminatorValue("MOBILE")
 public class Mobile extends Product {
     private String model;
-    private Double ScreenSize;
+    private Double screenSize;
     private String resolution;
     private String camera;
     private String battery; // mAh

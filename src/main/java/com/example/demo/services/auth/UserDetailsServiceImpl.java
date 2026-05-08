@@ -26,4 +26,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         return UserDetailsImpl.build(user);
     }
+
+    public Long countTotalUser(){
+        return userRepository.countTotalUsers();
+    }
 }

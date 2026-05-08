@@ -1,7 +1,10 @@
 package com.example.demo.controllers;
 
+import com.example.demo.config.UserDetailsImpl;
 import com.example.demo.services.CartService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,7 +29,8 @@ public class CartController {
     public ResponseEntity<?> addToCart(@RequestParam String cartKey,
                                        @RequestParam Long productVariantId,
                                        @RequestParam Integer quantity) {
-       return ResponseEntity.ok(cartService.addToCart(cartKey, productVariantId, quantity));
+        Long userId = getAuthenticatedUserId();
+        return ResponseEntity.ok(cartService.addToCart(cartKey, userId, productVariantId, quantity));
     }
 
     @PutMapping("/cart-item/{cartItemId}")
@@ -44,5 +48,19 @@ public class CartController {
     public ResponseEntity<?> deleteCartItem(@PathVariable Long cartId) {
         cartService.clearCart(cartId);
         return ResponseEntity.noContent().build();
+    }
+
+    private Long getAuthenticatedUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetailsImpl userDetails) {
+            return userDetails.getId();
+        }
+
+        return null;
     }
 }

@@ -30,18 +30,17 @@ public class CartService {
 
     @Transactional
     public CartItemResponse addToCart(String cartKey, Long variantId, Integer quantity) {
+        return addToCart(cartKey, null, variantId, quantity);
+    }
+
+    @Transactional
+    public CartItemResponse addToCart(String cartKey, Long userId, Long variantId, Integer quantity) {
 
         if (quantity == null || quantity <= 0) {
             throw new IllegalArgumentException("Quantity must be > 0");
         }
 
-        Cart cart = cartRepository.findByCartKey(cartKey)
-                .orElseGet(() -> {
-                    Cart c = new Cart();
-                    c.setCartKey(cartKey);
-                    c.setStatus(CartStatus.ACTIVE);
-                    return cartRepository.save(c);
-                });
+        Cart cart = resolveCart(cartKey, userId);
 
         ProductVariant variant = productVariantRepository.findById(variantId)
                 .orElseThrow(() -> new RuntimeException("Product variant not found"));
@@ -79,6 +78,38 @@ public class CartService {
         );
     }
 
+    private Cart resolveCart(String cartKey, Long userId) {
+        if (userId != null) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            return cartRepository.findByUserIdAndStatus(userId, CartStatus.ACTIVE)
+                    .orElseGet(() -> {
+                        Cart c = new Cart();
+                        c.setUser(user);
+                        c.setStatus(CartStatus.ACTIVE);
+                        c.setCartKey(buildUserCartKey(userId));
+                        return cartRepository.save(c);
+                    });
+        }
+
+        if (cartKey == null || cartKey.isBlank()) {
+            throw new IllegalArgumentException("cartKey is required for guest cart");
+        }
+
+        return cartRepository.findByCartKey(cartKey)
+                .orElseGet(() -> {
+                    Cart c = new Cart();
+                    c.setCartKey(cartKey);
+                    c.setStatus(CartStatus.ACTIVE);
+                    return cartRepository.save(c);
+                });
+    }
+
+    private String buildUserCartKey(Long userId) {
+        return "user_" + userId;
+    }
+
     public List<CartItemResponse> getCartItems(Long userId) {
         return cartItemRepository.getCartItemsByUserId(userId);
     }
@@ -102,70 +133,59 @@ public class CartService {
     @Transactional
     public void mergeCart(String cartKey, Long userId) {
 
-        Cart guestCart = cartRepository.findByCartKey(cartKey).orElse(null);
-        if (guestCart == null) return;
-
         Cart userCart = cartRepository
                 .findByUserIdAndStatus(userId, CartStatus.ACTIVE)
                 .orElse(null);
 
+        Cart guestCart = cartRepository.findByCartKey(cartKey)
+                .orElse(null);
+
+        if (guestCart == null) return;
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Case: user don't have cart set userId
         if (userCart == null) {
             guestCart.setUser(user);
             cartRepository.save(guestCart);
             return;
         }
 
-        // Case: avoid merge itself => if duplicate id then return
         if (guestCart.getId().equals(userCart.getId())) {
             return;
         }
 
-        // Case: merge 2 cart(guest and user) when user login
-
-        Map<Long, CartItem> map = new HashMap<>();
-        // create map from guest cart
-        for (CartItem item : guestCart.getItems()) {
-            map.put(
-                    item.getProductVariant().getId(),
-                    cloneItem(item)
-            );
-        }
-        // merge user cart into map
+        Map<Long, CartItem> userItemMap = new HashMap<>();
         for (CartItem item : userCart.getItems()) {
+            userItemMap.put(item.getProductVariant().getId(), item);
+        }
 
-            Long key = item.getProductVariant().getId();
+        for (CartItem guestItem : guestCart.getItems()) {
+            Long variantId = guestItem.getProductVariant().getId();
+            CartItem existingItem = userItemMap.get(variantId);
 
-            if (map.containsKey(key)) {
+            if (existingItem != null) {
+                int newQuantity = existingItem.getQuantity() + guestItem.getQuantity();
+                int stock = existingItem.getProductVariant().getStockQuantity();
 
-                CartItem existing = map.get(key);
-                // valid stock for product Variant
-                int mergedQty = existing.getQuantity() + item.getQuantity();
-
-                int stock = item.getProductVariant().getStockQuantity();
-
-                if (mergedQty > stock) {
-                    throw new RuntimeException(
-                            "Not enough stock for product variant: "
-                                    + item.getProductVariant().getId()
-                    );
+                if (newQuantity > stock) {
+                    newQuantity = stock;
                 }
-                existing.setQuantity(mergedQty);
-
+                existingItem.setQuantity(newQuantity);
             } else {
-
-                map.put(key, cloneItem(item));
+                CartItem newItem = new CartItem();
+                newItem.setCart(userCart);
+                newItem.setProductVariant(guestItem.getProductVariant());
+                newItem.setQuantity(guestItem.getQuantity());
+                newItem.setPrice(guestItem.getPrice());
+                newItem.setCreatedAt(LocalDateTime.now());
+                userCart.getItems().add(newItem);
             }
         }
-        List<CartItem> mergedList = new ArrayList<>(map.values());
-        userCart.setItems(mergedList);
+
         cartRepository.save(userCart);
         cartRepository.delete(guestCart);
     }
-
     @Transactional
     public void removeItem(Long cartItemId) {
         cartItemRepository.deleteById(cartItemId);
