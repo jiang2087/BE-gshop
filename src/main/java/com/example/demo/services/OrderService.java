@@ -3,6 +3,9 @@ package com.example.demo.services;
 import com.example.demo.Enums.OrderStatus;
 import com.example.demo.dto.request.PlaceOrderRequest;
 import com.example.demo.dto.response.OrderAdminResponse;
+import com.example.demo.dto.response.OrderItemResponse;
+import com.example.demo.dto.response.OrderUserResponse;
+import com.example.demo.dto.response.UserPurchaserResponse;
 import com.example.demo.models.Address;
 import com.example.demo.models.junction.AddressSnapShot;
 import com.example.demo.models.Order;
@@ -15,21 +18,22 @@ import com.example.demo.repository.OrderRepository;
 
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
+import com.example.demo.services.products.OrderItemService;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.time.temporal.TemporalAdjusters;
 import java.util.stream.Collectors;
 
 
@@ -46,6 +50,7 @@ public class OrderService {
     private final VoucherService voucherService;
     private final CartRepository cartRepository;
     private final DateTimeService dateTimeService;
+    private final OrderItemService orderItemService;
 
     @Transactional
     public Order placeOrder(PlaceOrderRequest request) {
@@ -146,7 +151,7 @@ public class OrderService {
     public String generateOrderCode() {
         String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
 
-        return "ORD-" + date + "-" + randomCode(4);
+        return date + "-" + randomCode(4);
     }
 
     private String randomCode(int length) {
@@ -204,6 +209,17 @@ public class OrderService {
     }
 
 
+    public Page<UserPurchaserResponse> getTopPurchasers(Pageable pageable) {
+        return orderRepository.findUserPurchaseTotalsDesc(pageable)
+                .map(row -> new UserPurchaserResponse(
+                        row.getUserId(),
+                        row.getUsername(),
+                        row.getEmail(),
+                        row.getTotalPurchased(),
+                        row.getLastPurchase()
+                ));
+    }
+
     public List<Map<String, Object>> getRevenueByDayOfWeek(String timeFrame) {
         LocalDate week;
         if("last week".equalsIgnoreCase(timeFrame)){
@@ -220,6 +236,7 @@ public class OrderService {
             Double total = ((Number) row[1]).doubleValue();
             map.put(day, total);
         }
+
 
         List<Integer> order = List.of(2,3,4,5,6,7,1);
 
@@ -246,8 +263,50 @@ public class OrderService {
         return result;
     }
 
-    public List<OrderAdminResponse> getAllOrder() {
-        return orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+    public Page<OrderAdminResponse> getAllOrder(Pageable pageable) {
+        return orderRepository.findAll(pageable)
+                .map(order -> new OrderAdminResponse(
+                        order.getId(),
+                        order.getOrderCode(),
+                        order.getShippingAddress() != null ? order.getShippingAddress().getRecipientName() : null,
+                        order.getShippingAddress() != null ? order.getShippingAddress().getPhone() : null,
+                        order.getTotalPrice(),
+                        order.getPaymentMethod(),
+                        order.getStatus(),
+                        order.getCreatedAt()
+                ));
+    }
+
+    public Page<OrderAdminResponse> getByStatus(@NotNull OrderStatus status, Pageable pageable) {
+        return orderRepository.findByStatus(status, pageable)
+                .map(order -> new OrderAdminResponse(
+                        order.getId(),
+                        order.getOrderCode(),
+                        order.getShippingAddress() != null ? order.getShippingAddress().getRecipientName() : null,
+                        order.getShippingAddress() != null ? order.getShippingAddress().getPhone() : null,
+                        order.getTotalPrice(),
+                        order.getPaymentMethod(),
+                        order.getStatus(),
+                        order.getCreatedAt()
+                ));
+    }
+
+    public Page<OrderAdminResponse> getByOrderCode(@NotNull String orderCode, Pageable pageable) {
+        return orderRepository.findByOrderCodeContainingIgnoreCase(orderCode, pageable)
+                .map(order -> new OrderAdminResponse(
+                        order.getId(),
+                        order.getOrderCode(),
+                        order.getShippingAddress() != null ? order.getShippingAddress().getRecipientName() : null,
+                        order.getShippingAddress() != null ? order.getShippingAddress().getPhone() : null,
+                        order.getTotalPrice(),
+                        order.getPaymentMethod(),
+                        order.getStatus(),
+                        order.getCreatedAt()
+                ));
+    }
+
+    public List<OrderAdminResponse> getOrderByUserId(@NotNull Long userId) {
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(order -> new OrderAdminResponse(
                         order.getId(),
@@ -260,6 +319,83 @@ public class OrderService {
                         order.getCreatedAt()
                 ))
                 .toList();
+    }
+
+    public List<OrderUserResponse> getMyOrders(@NotNull Long userId) {
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(order -> new OrderUserResponse(
+                        order.getId(),
+                        order.getOrderCode(),
+                        order.getStatus(),
+                        order.getTotalPrice(),
+                        order.getShippingFee(),
+                        order.getDiscountAmount(),
+                        order.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    public List<OrderItemResponse> getOrderItemsByOrderId(@NotNull Long orderId) {
+        return orderItemService.getByOrderId(orderId);
+    }
+
+    public BigDecimal getDiscountByOrderId(@NotNull Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found"));
+
+        return order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+    }
+
+    @Transactional
+    public Order updateStatus(@NotNull Long orderId, @NotNull OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found"));
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == newStatus) {
+            return order;
+        }
+
+        if (isValidStatusTransition(currentStatus, newStatus)) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid status transition: %s -> %s", currentStatus, newStatus));
+        }
+
+        order.setStatus(newStatus);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order updateStatusByUser(@NotNull Long userId, @NotNull Long orderId, @NotNull OrderStatus newStatus) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found"));
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == newStatus) {
+            return order;
+        }
+
+        if (isValidStatusTransition(currentStatus, newStatus)) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid status transition: %s -> %s", currentStatus, newStatus));
+        }
+
+        order.setStatus(newStatus);
+        return orderRepository.save(order);
+    }
+
+    private boolean isValidStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
+        if (currentStatus == OrderStatus.CANCELLED || currentStatus == OrderStatus.COMPLETED) {
+            return true;
+        }
+
+        return !switch (currentStatus) {
+            case PENDING -> newStatus == OrderStatus.PROCESSING || newStatus == OrderStatus.CANCELLED;
+            case PROCESSING -> newStatus == OrderStatus.SHIPPED || newStatus == OrderStatus.CANCELLED;
+            case SHIPPED -> newStatus == OrderStatus.COMPLETED;
+            default -> false;
+        };
     }
 
 }

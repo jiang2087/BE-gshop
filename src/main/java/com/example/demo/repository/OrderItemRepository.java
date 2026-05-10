@@ -1,6 +1,7 @@
 package com.example.demo.repository;
 
 
+import com.example.demo.dto.response.OrderItemResponse;
 import com.example.demo.models.products.OrderItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -32,4 +33,23 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByProductId(@Param("productId") Long productId);
 
     void deleteByOrderId(Long orderId);
+
+    @Query("""
+                SELECT new com.example.demo.dto.response.OrderItemResponse(
+                    oi.id,
+                    p.name,
+                    pv.image,
+                    pv.sku,
+                    oi.quantity,
+                    oi.price,
+                    ROUND(oi.price * oi.quantity, 2)
+                )
+                FROM OrderItem oi
+                JOIN oi.productVariant pv
+                JOIN pv.product p
+                WHERE oi.order.id = :orderId
+            """)
+    List<OrderItemResponse> getOrderItemsByOrderId(
+            @Param("orderId") Long orderId
+    );
 }

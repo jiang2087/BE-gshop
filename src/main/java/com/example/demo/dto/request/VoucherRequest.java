@@ -37,5 +37,4 @@ public record VoucherRequest(
     LocalDateTime endDate,
 
     Boolean active
-
 ) {}

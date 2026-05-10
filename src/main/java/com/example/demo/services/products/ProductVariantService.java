@@ -333,6 +333,9 @@ public class ProductVariantService {
                 r -> (Long) r[1]
         ));
     }
+    public Page<ProductVariant> getAllVariants(Pageable pageable) {
+        return productVariantRepository.findAll(pageable);
+    }
 
     public Page<Product> getProductsByPriceRange(List<String> types, BigDecimal min, BigDecimal max, Pageable pageable) {
         if (min.compareTo(BigDecimal.ZERO) < 0 || max.compareTo(BigDecimal.ZERO) < 0) {

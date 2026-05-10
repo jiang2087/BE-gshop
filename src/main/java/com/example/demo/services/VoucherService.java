@@ -3,6 +3,7 @@ package com.example.demo.services;
 import com.example.demo.Enums.DiscountType;
 import com.example.demo.Enums.VoucherErrorCode;
 import com.example.demo.dto.request.VoucherRequest;
+import com.example.demo.dto.response.VoucherResponse;
 import com.example.demo.exceptions.VoucherException;
 import com.example.demo.models.User;
 import com.example.demo.models.Voucher;
@@ -10,17 +11,17 @@ import com.example.demo.models.junction.UserVoucher;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.UserVoucherRepository;
 import com.example.demo.repository.VoucherRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.ErrorResponseException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -34,7 +35,7 @@ public class VoucherService {
     private static  final BigDecimal shippingFee = BigDecimal.valueOf(1.2);
 
     @Transactional
-    public Voucher createVoucher(VoucherRequest request) {
+    public VoucherResponse createVoucher(VoucherRequest request) {
         Voucher v = new Voucher();
         v.setCode(request.code());
         v.setType(request.type());
@@ -46,18 +47,48 @@ public class VoucherService {
         v.setUsedCount(0);
         v.setStartDate(request.startDate());
         v.setEndDate(request.endDate());
-        v.setActive(true);
+        v.setActive(request.active());
 
-        return voucherRepository.save(v);
+        return toResponse(voucherRepository.save(v));
     }
 
-    public List<Voucher> getVoucher() {
-        return voucherRepository.findAll();
+    @Transactional
+    public VoucherResponse updateVoucher(Long voucherId, VoucherRequest request) {
+        Voucher voucher = voucherRepository.findById(voucherId)
+                .orElseThrow(() -> new RuntimeException("Voucher not found"));
+
+        voucher.setCode(request.code());
+        voucher.setType(request.type());
+        voucher.setDiscountType(request.discountType());
+        voucher.setValue(request.value());
+        voucher.setMinOrderValue(request.minOrderValue());
+        voucher.setMaxDiscount(request.maxDiscount());
+        voucher.setQuantity(request.quantity());
+        voucher.setStartDate(request.startDate());
+        voucher.setEndDate(request.endDate());
+        voucher.setActive(request.active());
+
+        return toResponse(voucherRepository.save(voucher));
     }
 
-    public List<Voucher> getTop5VoucherByUser(Long userId){
+    public Page<VoucherResponse> getVoucher(String voucherCode, Boolean active, Pageable pageable) {
+        return voucherRepository.searchVouchers(voucherCode, active, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public void deleteVoucher(Long voucherId) {
+        if (!voucherRepository.existsById(voucherId)) {
+            throw new RuntimeException("Voucher not found");
+        }
+        voucherRepository.deleteById(voucherId);
+    }
+
+    public List<VoucherResponse> getTop5VoucherByUser(Long userId){
         Pageable pageable = PageRequest.of(0, 5);
-        return voucherRepository.findTopAvailableVouchers(userId, pageable);
+        return voucherRepository.findTopAvailableVouchers(userId, pageable).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
 
@@ -217,5 +248,22 @@ public class VoucherService {
     }
     private static BigDecimal safe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private VoucherResponse toResponse(Voucher voucher) {
+        return new VoucherResponse(
+                voucher.getId(),
+                voucher.getCode(),
+                voucher.getType(),
+                voucher.getDiscountType(),
+                voucher.getValue(),
+                voucher.getMinOrderValue(),
+                voucher.getMaxDiscount(),
+                voucher.getQuantity(),
+                voucher.getUsedCount(),
+                voucher.getStartDate(),
+                voucher.getEndDate(),
+                voucher.getActive()
+        );
     }
 }

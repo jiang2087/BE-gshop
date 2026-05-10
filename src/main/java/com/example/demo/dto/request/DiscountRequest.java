@@ -3,7 +3,6 @@ package com.example.demo.dto.request;
 import com.example.demo.Enums.DiscountType;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
-import java.util.List;
 
 public record DiscountRequest(
 
@@ -23,8 +22,6 @@ public record DiscountRequest(
     @NotNull
     LocalDateTime endDate,
 
-    Boolean active,
-
-    List<Long> productVariantIds
+    Boolean active
 
 ) {}

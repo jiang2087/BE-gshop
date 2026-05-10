@@ -1,5 +1,6 @@
 package com.example.demo.models;
 
+import com.example.demo.Enums.UserStatus;
 import com.example.demo.models.products.WishlistItem;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -42,6 +43,10 @@ public class User {
     @NotBlank
     @Size(max = 120)
     String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    UserStatus status =  UserStatus.ACTIVE;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles",

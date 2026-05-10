@@ -1,6 +1,10 @@
 package com.example.demo.repository;
 
+import com.example.demo.Enums.OrderStatus;
+import com.example.demo.dto.response.UserPurchaserProjection;
 import com.example.demo.models.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +18,11 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+    Page<Order> findByOrderCodeContainingIgnoreCase(String orderCode, Pageable pageable);
+    List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
+    Optional<Order> findByIdAndUserId(Long id, Long userId);
 
     @Query("""
                 SELECT o.id
@@ -76,5 +85,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
   ORDER BY FUNCTION('week', o.createdAt)
 """)
     List<Object[]> getProfitPerWeek(@Param("year") int year);
+
+    @Query(
+            value = """
+    SELECT u.id AS userId,
+           u.username AS username,
+           u.email AS email,
+           COALESCE(SUM(o.totalPrice), 0) AS totalPurchased,
+           MAX(o.createdAt) AS lastPurchase
+    FROM Order o
+    JOIN o.user u
+    WHERE o.status = 'COMPLETED'
+    GROUP BY u.id, u.username, u.email
+    ORDER BY COALESCE(SUM(o.totalPrice), 0) DESC
+""",
+            countQuery = """
+    SELECT COUNT(DISTINCT u.id)
+    FROM Order o
+    JOIN o.user u
+    WHERE o.status = 'COMPLETED'
+"""
+    )
+    Page<UserPurchaserProjection> findUserPurchaseTotalsDesc(Pageable pageable);
 
 }

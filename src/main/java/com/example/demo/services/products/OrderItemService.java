@@ -1,5 +1,6 @@
 package com.example.demo.services.products;
 
+import com.example.demo.dto.response.OrderItemResponse;
 import com.example.demo.models.Order;
 import com.example.demo.models.products.OrderItem;
 import com.example.demo.models.products.ProductVariant;
@@ -25,8 +26,8 @@ public class OrderItemService {
                 .orElseThrow(() -> new EntityNotFoundException("OrderItem not found with id: " + id));
     }
 
-    public List<OrderItem> getByOrderId(Long orderId) {
-        return orderItemRepository.findByOrderId(orderId);
+    public List<OrderItemResponse> getByOrderId(Long orderId) {
+        return orderItemRepository.getOrderItemsByOrderId(orderId);
     }
 
     public List<OrderItem> getByUserId(Long userId) {
@@ -100,9 +101,4 @@ public class OrderItemService {
         orderItemRepository.deleteByOrderId(orderId);
     }
 
-    public BigDecimal calculateOrderSubtotal(Long orderId) {
-        return getByOrderId(orderId).stream()
-                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
 }

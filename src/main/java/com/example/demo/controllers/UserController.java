@@ -1,15 +1,22 @@
 package com.example.demo.controllers;
 
+import com.example.demo.Enums.UserRole;
+import com.example.demo.Enums.UserStatus;
+import com.example.demo.dto.UserDTO;
 import com.example.demo.dto.request.UserChangeRequest;
 import com.example.demo.dto.response.JwtResponse;
 import com.example.demo.dto.response.MessageResponse;
 import com.example.demo.models.User;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.services.OrderService;
 import com.example.demo.services.auth.UserDetailsServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,11 +31,38 @@ public class UserController {
     private final UserDetailsServiceImpl userDetailsService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OrderService orderService;
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/total")
     public ResponseEntity<?> getTotalUser(){
         return ResponseEntity.ok(userDetailsService.countTotalUser());
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping
+    public ResponseEntity<Page<UserDTO>> getAllUsers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) UserStatus status,
+            @PageableDefault(size = 5) Pageable pageable
+    ) {
+        Page<UserDTO> users = userRepository.findNonAdminUsers(UserRole.ROLE_ADMIN, keyword, status, pageable)
+                .map(user -> new UserDTO(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getEmail(),
+                        user.getImageUrl(),
+                        user.getStatus() != null ? user.getStatus().name() : null
+                ));
+        return ResponseEntity.ok(users);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/top-purchasers")
+    public ResponseEntity<?> getTopPurchasers(
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        return ResponseEntity.ok(orderService.getTopPurchasers(pageable));
     }
 
     @PutMapping("/{id}")

@@ -4,6 +4,7 @@ import com.example.demo.dto.request.ProductRequest;
 import com.example.demo.dto.request.VariantRequest;
 import com.example.demo.dto.response.TopProductProjection;
 import com.example.demo.models.Product;
+import com.example.demo.models.products.ProductVariant;
 import com.example.demo.services.products.ProductVariantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -86,6 +87,11 @@ public class ProductController {
                 );
 
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/variants")
+    public ResponseEntity<Page<ProductVariant>> getTopVariants(Pageable pageable) {
+        return ResponseEntity.ok(productVariantService.getAllVariants(pageable));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

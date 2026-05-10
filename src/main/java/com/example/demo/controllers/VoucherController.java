@@ -1,11 +1,12 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dto.request.VoucherRequest;
-import com.example.demo.models.Voucher;
+import com.example.demo.dto.response.VoucherResponse;
 import com.example.demo.services.VoucherService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import okhttp3.Response;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,12 +21,16 @@ public class VoucherController {
     private final VoucherService voucherService;
 
     @GetMapping
-    public ResponseEntity<List<Voucher>> getVoucher() {
-        return ResponseEntity.ok(voucherService.getVoucher());
+    public ResponseEntity<?> getVoucher(
+            @RequestParam(required = false) String voucherCode,
+            @RequestParam(required = false) Boolean active,
+            @PageableDefault(size = 5) Pageable pageable
+    ) {
+        return ResponseEntity.ok(voucherService.getVoucher(voucherCode, active, pageable));
     }
 
     @GetMapping("/top-5/{userId}")
-    public ResponseEntity<List<Voucher>> getTop5Voucher(@PathVariable Long userId) {
+    public ResponseEntity<List<VoucherResponse>> getTop5Voucher(@PathVariable Long userId) {
         return ResponseEntity.ok(voucherService.getTop5VoucherByUser(userId));
     }
 
@@ -39,8 +44,16 @@ public class VoucherController {
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody @Valid VoucherRequest request) {
+    public ResponseEntity<VoucherResponse> create(@RequestBody @Valid VoucherRequest request) {
         return ResponseEntity.ok(voucherService.createVoucher(request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<VoucherResponse> update(
+            @PathVariable Long id,
+            @RequestBody @Valid VoucherRequest request
+    ) {
+        return ResponseEntity.ok(voucherService.updateVoucher(id, request));
     }
 
     @PostMapping("/collect")
@@ -61,6 +74,10 @@ public class VoucherController {
         var discount = voucherService.applyVoucher(code, userId, orderTotal);
         return ResponseEntity.ok(discount);
     }
-
-
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteVoucher(@PathVariable Long id) {
+        voucherService.deleteVoucher(id);
+        return ResponseEntity.noContent().build();
+    }
 }
+
