@@ -1,5 +1,6 @@
 package com.example.demo.repository;
 
+import com.example.demo.Enums.DiscountType;
 import com.example.demo.models.Discount;
 import com.example.demo.models.products.ProductVariant;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,8 +11,23 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface DiscountRepository extends JpaRepository<Discount, Long> {
+    interface ActiveVariantDiscountRow {
+        Long getVariantId();
+        DiscountType getDiscountType();
+        Double getDiscountValue();
+    }
+
+    @Query("""
+            SELECT DISTINCT d
+            FROM Discount d
+            LEFT JOIN FETCH d.productVariants pv
+            WHERE d.id = :discountId
+            """)
+    Optional<Discount> findByIdWithProductVariants(@Param("discountId") Long discountId);
+
     @Query("""
             SELECT d FROM Discount d
             WHERE (:active IS NULL OR d.active = :active)
@@ -31,6 +47,20 @@ public interface DiscountRepository extends JpaRepository<Discount, Long> {
             AND :now BETWEEN d.startDate AND d.endDate
             """)
     List<Discount> findActiveDiscountByProduct(Long productId, LocalDateTime now);
+
+    @Query("""
+            SELECT pv.id AS variantId, d.type AS discountType, d.value AS discountValue
+            FROM Discount d
+            JOIN d.productVariants pv
+            WHERE pv.id IN :variantIds
+            AND d.active = true
+            AND :now BETWEEN d.startDate AND d.endDate
+            ORDER BY d.id ASC
+            """)
+    List<ActiveVariantDiscountRow> findActiveDiscountRowsByVariantIds(
+            @Param("variantIds") List<Long> variantIds,
+            @Param("now") LocalDateTime now
+    );
 
     @Query("""
             SELECT pv

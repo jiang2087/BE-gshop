@@ -9,7 +9,7 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "watches")
-@DiscriminatorValue("WATCH")
+@DiscriminatorValue("WATCHES")
 @Setter
 @Getter
 public class Watches extends Product {

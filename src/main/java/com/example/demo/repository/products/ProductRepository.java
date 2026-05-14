@@ -13,6 +13,9 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    @Query("SELECT DISTINCT LOWER(TRIM(p.brand)) FROM Product p WHERE p.brand IS NOT NULL AND TRIM(p.brand) <> ''")
+    List<String> findDistinctNormalizedBrands();
+
     @Query("""
                 SELECT p.name FROM Product p WHERE p.id in :ids
             """)
@@ -72,3 +75,4 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             Pageable pageable
     );
 }
+

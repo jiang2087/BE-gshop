@@ -3,6 +3,7 @@ package com.example.demo.services;
 import com.example.demo.Enums.DiscountType;
 import com.example.demo.Enums.VoucherErrorCode;
 import com.example.demo.dto.request.VoucherRequest;
+import com.example.demo.dto.response.UserVoucherResponse;
 import com.example.demo.dto.response.VoucherResponse;
 import com.example.demo.exceptions.VoucherException;
 import com.example.demo.models.User;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -89,6 +91,33 @@ public class VoucherService {
         return voucherRepository.findTopAvailableVouchers(userId, pageable).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    public List<UserVoucherResponse> getUserUsableVouchers(Long userId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<UserVoucher> userVouchers = userVoucherRepository.findAllUnusedByUserId(userId);
+        List<UserVoucherResponse> responses = new ArrayList<>();
+
+        for (UserVoucher uv : userVouchers) {
+            Voucher voucher = uv.getVoucher();
+
+            responses.add(new UserVoucherResponse(
+                    voucher.getId(),
+                    voucher.getCode(),
+                    voucher.getType(),
+                    voucher.getDiscountType(),
+                    voucher.getValue(),
+                    voucher.getMinOrderValue(),
+                    voucher.getMaxDiscount(),
+                    voucher.getStartDate(),
+                    voucher.getEndDate(),
+                    voucher.getActive()
+            ));
+        }
+
+        return responses;
     }
 
 

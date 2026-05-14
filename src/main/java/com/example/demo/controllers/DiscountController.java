@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/discounts")
@@ -69,6 +70,11 @@ public class DiscountController {
             @PageableDefault(size = 10) Pageable pageable
     ) {
         return ResponseEntity.ok(discountService.getVariantInDiscount(id, sku, pageable));
+    }
+
+    @GetMapping("/{id}/variants/in/discounted-values")
+    public ResponseEntity<Map<Long, Double>> getDiscountedValuesOfVariants(@PathVariable Long id) {
+        return ResponseEntity.ok(discountService.getDiscountedValuesOfVariants(id));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

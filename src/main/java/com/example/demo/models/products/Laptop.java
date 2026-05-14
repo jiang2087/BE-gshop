@@ -13,12 +13,12 @@ import lombok.Setter;
 @DiscriminatorValue("LAPTOP")
 @Getter
 @Setter
-public class Laptop extends Product {
-    private String cpu;
-    private String ram;
-    private String storage;
-    private String gpu;
-    private String resolution;
-    private Double screenSize;
-    private String dimension;
-}
+    public class Laptop extends Product {
+        private String cpu;
+        private String ram;
+        private String storage;
+        private String gpu;
+        private String resolution;
+        private Double screenSize;
+        private String dimension;
+    }

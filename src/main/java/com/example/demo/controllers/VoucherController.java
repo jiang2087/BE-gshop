@@ -1,6 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.dto.request.VoucherRequest;
+import com.example.demo.dto.response.UserVoucherResponse;
 import com.example.demo.dto.response.VoucherResponse;
 import com.example.demo.services.VoucherService;
 import jakarta.validation.Valid;
@@ -32,6 +33,11 @@ public class VoucherController {
     @GetMapping("/top-5/{userId}")
     public ResponseEntity<List<VoucherResponse>> getTop5Voucher(@PathVariable Long userId) {
         return ResponseEntity.ok(voucherService.getTop5VoucherByUser(userId));
+    }
+
+    @GetMapping("/user/{userId}/usable")
+    public ResponseEntity<List<UserVoucherResponse>> getUserUsableVouchers(@PathVariable Long userId) {
+        return ResponseEntity.ok(voucherService.getUserUsableVouchers(userId));
     }
 
     @GetMapping("/preview")

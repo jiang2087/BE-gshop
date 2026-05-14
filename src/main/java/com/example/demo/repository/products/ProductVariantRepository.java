@@ -38,8 +38,25 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
             """)
     List<ProductVariant> findAllWithProductByIdIn(@Param("variantIds") Collection<Long> variantIds);
 
+    @Query("""
+            SELECT pv
+            FROM ProductVariant pv
+            LEFT JOIN FETCH pv.color
+            WHERE pv.product.id IN :productIds
+            """)
+    List<ProductVariant> findAllByProductIdInWithColor(@Param("productIds") Collection<Long> productIds);
+
     @Query("SELECT COUNT(v) FROM ProductVariant v")
     long countProductVariants();
+
+    @Query("""
+            SELECT pv
+            FROM ProductVariant pv
+            JOIN FETCH pv.product p
+            LEFT JOIN FETCH pv.color c
+            WHERE pv.active = true
+            """)
+    List<ProductVariant> findAllActiveWithProductAndColor();
 
     @Query(value = """
     SELECT

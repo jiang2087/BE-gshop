@@ -1,8 +1,8 @@
 package com.example.demo.controllers.products;
 
+import com.example.demo.dto.product.ProductDetailDto;
 import com.example.demo.dto.request.ProductRequest;
 import com.example.demo.dto.request.VariantRequest;
-import com.example.demo.dto.response.TopProductProjection;
 import com.example.demo.models.Product;
 import com.example.demo.models.products.ProductVariant;
 import com.example.demo.services.products.ProductVariantService;
@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +25,7 @@ public class ProductController {
     private final ProductVariantService productVariantService;
 
     @GetMapping
-    public ResponseEntity<?> getAllProducts(Pageable pageable) {
+    public ResponseEntity<Page<ProductDetailDto>> getAllProducts(Pageable pageable) {
 
 
         return ResponseEntity.ok(productVariantService.getAllProducts(pageable));
@@ -38,7 +37,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable long id) {
+    public ResponseEntity<ProductDetailDto> getProductById(@PathVariable long id) {
         return ResponseEntity.ok(productVariantService.getProductById(id));
     }
 
@@ -146,3 +145,4 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 }
+

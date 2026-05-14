@@ -1,6 +1,10 @@
 package com.example.demo.services.products;
 
 import com.example.demo.Enums.ProductType;
+import com.example.demo.Enums.DiscountType;
+import com.example.demo.dto.product.ColorDto;
+import com.example.demo.dto.product.ProductDetailDto;
+import com.example.demo.dto.product.ProductVariantDto;
 import com.example.demo.dto.request.ProductRequest;
 import com.example.demo.dto.request.VariantRequest;
 import com.example.demo.dto.response.TopProductProjection;
@@ -11,6 +15,7 @@ import com.example.demo.models.products.Mobile;
 import com.example.demo.models.products.ProductVariant;
 import com.example.demo.models.products.Television;
 import com.example.demo.models.products.Watches;
+import com.example.demo.repository.DiscountRepository;
 import com.example.demo.repository.ColorRepository;
 import com.example.demo.repository.products.ProductRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
@@ -27,7 +32,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +48,7 @@ import java.util.stream.Collectors;
 public class ProductVariantService {
 
     private final ProductVariantRepository productVariantRepository;
+    private final DiscountRepository discountRepository;
     private final SkuGenerator skuGenerator;
     private final ProductRepository productRepository;
     private final ColorRepository colorRepository;
@@ -243,7 +253,7 @@ public class ProductVariantService {
         }
     }
 
-    public Page<Product> getAllProducts(Pageable pageable) {
+    public Page<ProductDetailDto> getAllProducts(Pageable pageable) {
 
         Specification<Product> spec = (root, query, cb) -> {
 
@@ -302,16 +312,96 @@ public class ProductVariantService {
                 pageable.getPageSize()
         );
 
-        return productRepository.findAll(spec, cleanPageable);
+        Page<Product> page = productRepository.findAll(spec, cleanPageable);
+        List<Long> productIds = page.getContent().stream().map(Product::getId).toList();
+        if (productIds.isEmpty()) {
+            return page.map(p -> toProductDetailDto(p, List.of(), Map.of()));
+        }
+
+        List<ProductVariant> variants = productVariantRepository.findAllByProductIdInWithColor(productIds);
+        Map<Long, List<ProductVariant>> variantsByProductId = variants.stream()
+                .collect(Collectors.groupingBy(v -> v.getProduct().getId()));
+
+        List<Long> variantIds = variants.stream().map(ProductVariant::getId).toList();
+        Map<Long, DiscountRepository.ActiveVariantDiscountRow> discountByVariantId = new HashMap<>();
+        if (!variantIds.isEmpty()) {
+            for (DiscountRepository.ActiveVariantDiscountRow row :
+                    discountRepository.findActiveDiscountRowsByVariantIds(variantIds, LocalDateTime.now())) {
+                discountByVariantId.putIfAbsent(row.getVariantId(), row);
+            }
+        }
+
+        return page.map(product -> toProductDetailDto(
+                product,
+                variantsByProductId.getOrDefault(product.getId(), List.of()),
+                discountByVariantId
+        ));
     }
 
     public List<String> getNameByIds(List<Long> ids) {
         return productRepository.findByIds(ids);
     }
 
-    public Product getProductById(Long id) {
-        return productRepository.findById(id)
+    public ProductDetailDto getProductById(Long id) {
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("product not found"));
+
+        List<ProductVariant> variants = productVariantRepository.findAllByProductIdInWithColor(List.of(id));
+        List<Long> variantIds = variants.stream().map(ProductVariant::getId).toList();
+
+        Map<Long, DiscountRepository.ActiveVariantDiscountRow> discountByVariantId = new HashMap<>();
+        if (!variantIds.isEmpty()) {
+            for (DiscountRepository.ActiveVariantDiscountRow row :
+                    discountRepository.findActiveDiscountRowsByVariantIds(variantIds, LocalDateTime.now())) {
+                discountByVariantId.putIfAbsent(row.getVariantId(), row);
+            }
+        }
+
+        return toProductDetailDto(product, variants, discountByVariantId);
+    }
+
+
+    /**
+     * Batch load products by IDs to avoid N+1 query problem
+     * @param productIds List of product IDs
+     * @return Map of productId -> ProductDetailDto
+     */
+    public Map<Long, ProductDetailDto> getProductsByIds(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        // Batch load all products
+        List<Product> products = productRepository.findAllById(productIds);
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+
+        // Batch load all variants for these products
+        List<ProductVariant> variants = productVariantRepository.findAllByProductIdInWithColor(productIds);
+        List<Long> variantIds = variants.stream().map(ProductVariant::getId).toList();
+
+        // Batch load all discounts
+        Map<Long, DiscountRepository.ActiveVariantDiscountRow> discountByVariantId = new HashMap<>();
+        if (!variantIds.isEmpty()) {
+            for (DiscountRepository.ActiveVariantDiscountRow row :
+                    discountRepository.findActiveDiscountRowsByVariantIds(variantIds, LocalDateTime.now())) {
+                discountByVariantId.putIfAbsent(row.getVariantId(), row);
+            }
+        }
+
+        // Group variants by product ID
+        Map<Long, List<ProductVariant>> variantsByProductId = variants.stream()
+                .collect(Collectors.groupingBy(v -> v.getProduct().getId()));
+
+        // Build ProductDetailDto map
+        Map<Long, ProductDetailDto> result = new LinkedHashMap<>();
+        for (Product product : products) {
+            List<ProductVariant> productVariants = variantsByProductId.getOrDefault(product.getId(), List.of());
+            result.put(product.getId(), toProductDetailDto(product, productVariants, discountByVariantId));
+        }
+
+        return result;
     }
 
     public Page<Product> getProductByType(List<String> types, Pageable pageable) {
@@ -411,4 +501,95 @@ public class ProductVariantService {
             throw new IllegalArgumentException("Invalid product type: " + type, e);
         }
     }
+
+    private ProductDetailDto toProductDetailDto(
+            Product product,
+            List<ProductVariant> variants,
+            Map<Long, DiscountRepository.ActiveVariantDiscountRow> discountByVariantId
+    ) {
+        Map<String, Object> productAttributes = new LinkedHashMap<>();
+        if (product instanceof Mobile mobile) {
+            productAttributes.put("model", mobile.getModel());
+            productAttributes.put("screenSize", mobile.getScreenSize());
+            productAttributes.put("resolution", mobile.getResolution());
+            productAttributes.put("camera", mobile.getCamera());
+            productAttributes.put("battery", mobile.getBattery());
+            productAttributes.put("dimension", mobile.getDimension());
+        } else if (product instanceof Watches watch) {
+            productAttributes.put("model", watch.getModel());
+            productAttributes.put("gender", watch.getGender());
+            productAttributes.put("material", watch.getMaterial());
+            productAttributes.put("batteryLife", watch.getBatteryLife());
+            productAttributes.put("screenSize", watch.getScreenSize());
+            productAttributes.put("gps", watch.getGps());
+            productAttributes.put("weight", watch.getWeight());
+        } else if (product instanceof Laptop laptop) {
+            productAttributes.put("cpu", laptop.getCpu());
+            productAttributes.put("ram", laptop.getRam());
+            productAttributes.put("storage", laptop.getStorage());
+            productAttributes.put("gpu", laptop.getGpu());
+            productAttributes.put("resolution", laptop.getResolution());
+            productAttributes.put("screenSize", laptop.getScreenSize());
+            productAttributes.put("dimension", laptop.getDimension());
+        } else if (product instanceof Television television) {
+            productAttributes.put("resolution", television.getResolution());
+            productAttributes.put("refreshRate", television.getRefreshRate());
+            productAttributes.put("screenSize", television.getScreenSize());
+            productAttributes.put("weight", television.getWeight());
+            productAttributes.put("warrantyMonths", television.getWarrantyMonths());
+        }
+
+        List<ProductVariantDto> variantDtos = variants.stream()
+                .sorted(Comparator.comparing(ProductVariant::getId))
+                .map(variant -> toProductVariantDto(variant, discountByVariantId.get(variant.getId())))
+                .toList();
+
+        return new ProductDetailDto(
+                product.getId(),
+                product.getName(),
+                product.getBrand(),
+                product.getDescription(),
+                product.getProductType(),
+                product.getThumbnail(),
+                product.getCreated(),
+                productAttributes,
+                variantDtos
+        );
+    }
+
+    private ProductVariantDto toProductVariantDto(
+            ProductVariant variant,
+            DiscountRepository.ActiveVariantDiscountRow discountRow
+    ) {
+        double originalPrice = variant.getPrice().doubleValue();
+        double discountedPrice = originalPrice;
+
+        if (discountRow != null) {
+            if (discountRow.getDiscountType() == DiscountType.PERCENTAGE) {
+                discountedPrice = originalPrice * (1 - discountRow.getDiscountValue() / 100d);
+            } else {
+                discountedPrice = Math.max(0d, originalPrice - discountRow.getDiscountValue());
+            }
+        }
+
+        Color color = variant.getColor();
+        ColorDto colorDto = color == null
+                ? null
+                : new ColorDto(color.getId(), color.getName(), color.getHexCode());
+
+        return new ProductVariantDto(
+                variant.getId(),
+                variant.getSku(),
+                originalPrice,
+                variant.getStockQuantity(),
+                variant.getActive(),
+                variant.getIsDefault(),
+                variant.getImage(),
+                variant.getVersion(),
+                colorDto,
+                discountedPrice,
+                discountRow == null ? null : discountRow.getDiscountType()
+        );
+    }
+
 }
