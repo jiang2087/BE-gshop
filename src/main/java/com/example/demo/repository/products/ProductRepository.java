@@ -61,13 +61,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query(value = """
     SELECT p.id
     FROM products p
-
-    WHERE MATCH(p.name, p.brand)
-          AGAINST(:keyword IN BOOLEAN MODE)
-
-    ORDER BY
-        MATCH(p.name, p.brand)
-        AGAINST(:keyword IN BOOLEAN MODE) DESC
+    WHERE MATCH(p.name, p.brand) AGAINST(:keyword IN BOOLEAN MODE)
+    ORDER BY MATCH(p.name, p.brand) AGAINST(:keyword IN BOOLEAN MODE) DESC
     """,
             nativeQuery = true)
     Page<Long> searchIds(

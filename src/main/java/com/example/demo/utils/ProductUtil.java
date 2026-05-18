@@ -75,9 +75,14 @@ public class ProductUtil {
 
     public String toBooleanKeyword(String input) {
 
-        return Arrays.stream(input.trim().split("\\s+"))
+        return Arrays.stream(input.trim().split("\s+"))
                 .filter(word -> !word.isBlank())
-                .map(word -> "+" + word + "*")
+                .map(word -> {
+                    // Remove special characters that cause FULLTEXT boolean syntax errors
+                    String sanitized = word.replaceAll("[+\\-<>()~*\"@]", "");
+                    return sanitized.isBlank() ? "" : "+" + sanitized + "*";
+                })
+                .filter(term -> !term.isBlank())
                 .collect(Collectors.joining(" "));
     }
 

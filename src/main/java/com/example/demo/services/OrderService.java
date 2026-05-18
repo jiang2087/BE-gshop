@@ -6,6 +6,7 @@ import com.example.demo.dto.response.OrderAdminResponse;
 import com.example.demo.dto.response.OrderItemResponse;
 import com.example.demo.dto.response.OrderUserResponse;
 import com.example.demo.dto.response.UserPurchaserResponse;
+import com.example.demo.dto.response.ProductPurchaseResponse;
 import com.example.demo.models.Address;
 import com.example.demo.models.junction.AddressSnapShot;
 import com.example.demo.models.Order;
@@ -398,4 +399,56 @@ public class OrderService {
         };
     }
 
+
+    public List<UserPurchaserResponse> getTopPurchasers(Integer limit) {
+        Pageable pageable = limit != null && limit > 0 
+            ? Pageable.ofSize(limit) 
+            : Pageable.ofSize(10);
+        
+        return orderRepository.findUserPurchaseTotalsDesc(pageable)
+                .stream()
+                .map(projection -> new UserPurchaserResponse(
+                        projection.getUserId(),
+                        projection.getUsername(),
+                        projection.getEmail(),
+                        projection.getTotalPurchased(),
+                        projection.getLastPurchase()
+                ))
+                .toList();
+    }
+
+
+    public List<ProductPurchaseResponse> getTopProductsByPurchaseCount(Integer limit) {
+        Pageable pageable = limit != null && limit > 0
+            ? Pageable.ofSize(limit)
+            : Pageable.ofSize(10);
+
+        List<Object[]> results = orderRepository.findTopProductsByPurchaseCount(pageable);
+        return results.stream()
+                .map(row -> new ProductPurchaseResponse(
+                        ((Number) row[0]).longValue(),
+                        (String) row[1],
+                        ((Number) row[2]).longValue(),
+                        ((Number) row[3]).longValue(),
+                        null
+                ))
+                .toList();
+    }
+
+    public List<ProductPurchaseResponse> getMostPurchasedProducts(Integer limit) {
+        Pageable pageable = limit != null && limit > 0
+            ? Pageable.ofSize(limit)
+            : Pageable.ofSize(10);
+
+        return orderRepository.findMostPurchasedProducts(pageable)
+                .stream()
+                .map(projection -> new ProductPurchaseResponse(
+                        projection.getProductId(),
+                        projection.getProductName(),
+                        projection.getTotalQuantitySold(),
+                        projection.getOrderCount(),
+                        projection.getTotalRevenue()
+                ))
+                .toList();
+    }
 }

@@ -15,25 +15,21 @@ public class TelevisionSemanticBuilder implements ProductSemanticBuilder {
     public String build(ProductDetailDto product) {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(String.format("%s là tivi của %s.\n\n", product.name(), product.brand()));
+        sb.append(product.name()).append(" television by ").append(product.brand()).append(".\n");
 
-        sb.append("Mô tả:\n");
-        sb.append(product.description()).append("\n\n");
-
-        sb.append("Thông số:\n");
         var attrs = product.productAttributes();
         if (attrs != null) {
-            appendIfPresent(sb, "Kích thước", attrs.get("screenSize"));
-            appendIfPresent(sb, "Độ phân giải", attrs.get("resolution"));
-            appendIfPresent(sb, "Tần số quét", attrs.get("refreshRate"));
-            appendIfPresent(sb, "Trọng lượng", attrs.get("weight"));
-            appendIfPresent(sb, "Bảo hành", attrs.get("warrantyMonths"));
+            appendIfPresent(sb, attrs.get("screenSize"), attrs.get("screenSize") + " inch screen.\n");
+            appendIfPresent(sb, attrs.get("resolution"), attrs.get("resolution") + " resolution.\n");
+            appendIfPresent(sb, attrs.get("refreshRate"), attrs.get("refreshRate") + "Hz refresh rate.\n");
+            appendIfPresent(sb, attrs.get("weight"), attrs.get("weight") + " weight.\n");
+            appendIfPresent(sb, attrs.get("warrantyMonths"), attrs.get("warrantyMonths") + " months warranty.\n");
         }
 
-        // Dynamic use-case detection
         appendUseCases(sb, attrs);
+        appendCategory(sb, attrs);
 
-        return sb.toString();
+        return sb.toString().trim();
     }
 
     private void appendUseCases(StringBuilder sb, java.util.Map<String, Object> attrs) {
@@ -41,84 +37,136 @@ public class TelevisionSemanticBuilder implements ProductSemanticBuilder {
             return;
         }
 
-        sb.append("\nPhù hợp cho:\n");
+        java.util.Set<String> useCases = new java.util.LinkedHashSet<>();
 
         String resolution = safe(attrs.get("resolution")).toLowerCase();
         Object refreshRateObj = attrs.get("refreshRate");
         Object screenSizeObj = attrs.get("screenSize");
         Object warrantyMonthsObj = attrs.get("warrantyMonths");
 
-        // 4K/8K resolution
-        if (resolution.contains("4k") || resolution.contains("uhd") 
-                || resolution.contains("8k")) {
-            sb.append("- xem phim chất lượng cao\n");
-            sb.append("- giải trí gia đình\n");
-            sb.append("- xem thể thao\n");
+        if (resolution.contains("4k") || resolution.contains("uhd") ||
+            resolution.contains("8k")) {
+            useCases.add("high-quality movie watching");
+            useCases.add("home entertainment");
+            useCases.add("sports viewing");
         }
 
-        // High refresh rate
         if (refreshRateObj != null) {
             try {
                 int refreshRate = Integer.parseInt(refreshRateObj.toString());
                 if (refreshRate >= 120) {
-                    sb.append("- chơi game\n");
-                    sb.append("- xem thể thao\n");
-                    sb.append("- hành động mượt mà\n");
+                    useCases.add("gaming");
+                    useCases.add("fast-action content");
                 }
             } catch (NumberFormatException ignored) {
             }
         }
 
-        // Screen size detection
         if (screenSizeObj != null) {
             try {
                 double screenSize = Double.parseDouble(screenSizeObj.toString());
                 if (screenSize >= 55) {
-                    sb.append("- phòng khách rộng\n");
-                    sb.append("- rạp phim gia đình\n");
-                    sb.append("- xem tập thể\n");
+                    useCases.add("large living room");
+                    useCases.add("group viewing");
                 } else if (screenSize >= 32) {
-                    sb.append("- phòng ngủ\n");
-                    sb.append("- phòng nhỏ\n");
-                    sb.append("- văn phòng\n");
+                    useCases.add("bedroom");
+                    useCases.add("small room");
                 } else {
-                    sb.append("- phòng nhỏ\n");
-                    sb.append("- bếp\n");
-                    sb.append("- tiết kiệm không gian\n");
+                    useCases.add("small space");
                 }
             } catch (NumberFormatException ignored) {
             }
         }
 
-        // Full HD
         if (resolution.contains("full hd") || resolution.contains("1080p")) {
-            sb.append("- xem phim\n");
-            sb.append("- xem truyền hình\n");
+            useCases.add("movies and TV shows");
         }
 
-        // HD
-        if (resolution.contains("hd") && !resolution.contains("full") 
-                && !resolution.contains("uhd") && !resolution.contains("4k")) {
-            sb.append("- xem truyền hình\n");
-            sb.append("- tiết kiệm\n");
+        if (resolution.contains("hd") && !resolution.contains("full") &&
+            !resolution.contains("uhd") && !resolution.contains("4k")) {
+            useCases.add("basic TV viewing");
         }
 
-        // Long warranty
         if (warrantyMonthsObj != null) {
             try {
                 int warrantyMonths = Integer.parseInt(warrantyMonthsObj.toString());
                 if (warrantyMonths >= 24) {
-                    sb.append("- bảo hành tốt\n");
-                    sb.append("- yên tâm sử dụng\n");
+                    useCases.add("worry-free long-term use");
                 }
             } catch (NumberFormatException ignored) {
             }
         }
+        if (!useCases.isEmpty()) {
+            sb.append("\nBest for:\n");
+            for (String useCase : useCases) {
+                sb.append("- ").append(useCase).append("\n");
+            }
+        }
     }
 
-    private void appendIfPresent(StringBuilder sb, String label, Object value) {
+    private void appendCategory(StringBuilder sb, java.util.Map<String, Object> attrs) {
+        if (attrs == null) {
+            return;
+        }
+
+        java.util.Set<String> categories = new java.util.LinkedHashSet<>();
+
+        String resolution = safe(attrs.get("resolution")).toLowerCase();
+        Object refreshRateObj = attrs.get("refreshRate");
+        Object screenSizeObj = attrs.get("screenSize");
+
+        int refreshRate = 0;
+        if (refreshRateObj != null) {
+            try {
+                refreshRate = Integer.parseInt(refreshRateObj.toString());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        double screenSize = 0;
+        if (screenSizeObj != null) {
+            try {
+                screenSize = Double.parseDouble(screenSizeObj.toString());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        if ((resolution.contains("8k") || resolution.contains("4k")) &&
+            refreshRate >= 120 && screenSize >= 55) {
+            categories.add("premium television");
+            categories.add("high-end TV");
+        }
+        else if (resolution.contains("4k") && screenSize >= 43) {
+            categories.add("mid-range television");
+            categories.add("4K TV");
+        }
+        else if (resolution.contains("full hd") || resolution.contains("1080p")) {
+            categories.add("budget television");
+            categories.add("Full HD TV");
+        }
+        else if (screenSize >= 65) {
+            categories.add("large-screen television");
+            categories.add("home entertainment TV");
+        }
+        else if (screenSize <= 32) {
+            categories.add("compact television");
+            categories.add("small TV");
+        }
+        else {
+            categories.add("standard television");
+        }
+
+        if (!categories.isEmpty()) {
+            sb.append("\nCategory:\n");
+            for (String category : categories) {
+                sb.append(category).append("\n");
+            }
+        }
+    }
+
+    private void appendIfPresent(StringBuilder sb, Object value, String text) {
         if (value != null && !value.toString().trim().isEmpty()) {
-            sb.append(label).append(": ").append(value).append("\n");
+            sb.append(text);
         }
     }
 

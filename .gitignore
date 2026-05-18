@@ -32,5 +32,6 @@ src/main/resources/data.sql
 ### VS Code ###
 .vscode/
 
+/qdrant_storage/
 ### .env
 .env

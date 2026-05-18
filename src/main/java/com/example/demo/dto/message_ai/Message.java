@@ -1,6 +1,7 @@
 package com.example.demo.dto.message_ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -13,5 +14,7 @@ public class Message {
     private String content;
     private String refusal;
     private String reasoning;
-    private List<ToolCall> tool_calls;
+
+    @JsonProperty("tool_calls")
+    private List<ToolCall> toolCalls;
 }
