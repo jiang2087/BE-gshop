@@ -1,5 +1,6 @@
 package com.example.demo.config;
 
+import org.springframework.context.annotation.Lazy;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +19,7 @@ import java.time.Duration;
 public class RedisConfig {
 
     @Bean
+    @Lazy
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
@@ -34,6 +36,7 @@ public class RedisConfig {
     }
 
     @Bean
+    @Lazy
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         GenericJacksonJsonRedisSerializer  serializer = new GenericJacksonJsonRedisSerializer (redisObjectMapper());
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()

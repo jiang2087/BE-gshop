@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -168,6 +169,73 @@ public class DiscountService{
         discountRepository.save(discount);
     }
 
+
+
+    public Map<Long, DiscountInfo> getDiscountsByVariantIds(List<Long> productVariantIds) {
+        if (productVariantIds == null || productVariantIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<DiscountRepository.ActiveVariantDiscountRow> discountRows = 
+                discountRepository.findActiveDiscountRowsByVariantIds(
+                        productVariantIds, 
+                        LocalDateTime.now()
+                );
+
+        return discountRows.stream()
+                .collect(Collectors.toMap(
+                        DiscountRepository.ActiveVariantDiscountRow::getVariantId,
+                        row -> new DiscountInfo(
+                                row.getDiscountType(),
+                                row.getDiscountValue()
+                        ),
+                        (existing, replacement) -> existing
+                ));
+    }
+
+
+    public Map<Long, Double> calculateDiscountedPrices(Map<Long, Double> variantPrices) {
+        if (variantPrices == null || variantPrices.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, DiscountInfo> discounts = getDiscountsByVariantIds(
+                new ArrayList<>(variantPrices.keySet())
+        );
+
+        Map<Long, Double> discountedPrices = new LinkedHashMap<>();
+        
+        for (Map.Entry<Long, Double> entry : variantPrices.entrySet()) {
+            Long variantId = entry.getKey();
+            Double originalPrice = entry.getValue();
+            
+            DiscountInfo discount = discounts.get(variantId);
+            
+            if (discount == null) {
+                discountedPrices.put(variantId, originalPrice);
+            } else {
+                double discountedPrice;
+                if (discount.type() == DiscountType.PERCENTAGE) {
+                    discountedPrice = originalPrice * (1 - discount.value() / 100);
+                } else {
+                    discountedPrice = Math.max(0, originalPrice - discount.value());
+                }
+                
+                discountedPrice = BigDecimal.valueOf(discountedPrice)
+                        .setScale(2, RoundingMode.HALF_UP)
+                        .doubleValue();
+                        
+                discountedPrices.put(variantId, discountedPrice);
+            }
+        }
+        
+        return discountedPrices;
+    }
+
+    public record DiscountInfo(
+            DiscountType type,
+            Double value
+    ) {}
     private DiscountResponse toResponse(Discount discount) {
         return new DiscountResponse(
                 discount.getId(),

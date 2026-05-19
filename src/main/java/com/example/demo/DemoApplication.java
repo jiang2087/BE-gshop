@@ -13,7 +13,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 @EnableScheduling
-@EnableRedisRepositories(basePackages = "com.example.demo.redis")
 @EnableJpaRepositories(basePackages = "com.example.demo.repository")
 public class DemoApplication {
 

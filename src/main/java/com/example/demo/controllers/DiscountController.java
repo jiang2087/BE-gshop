@@ -112,4 +112,18 @@ public class DiscountController {
         discountService.deleteDiscount(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/by-variants")
+    public ResponseEntity<Map<Long, DiscountService.DiscountInfo>> getDiscountsByVariantIds(
+            @RequestBody List<Long> productVariantIds
+    ) {
+        return ResponseEntity.ok(discountService.getDiscountsByVariantIds(productVariantIds));
+    }
+
+    @PostMapping("/calculate-prices")
+    public ResponseEntity<Map<Long, Double>> calculateDiscountedPrices(
+            @RequestBody Map<Long, Double> variantPrices
+    ) {
+        return ResponseEntity.ok(discountService.calculateDiscountedPrices(variantPrices));
+    }
 }
