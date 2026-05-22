@@ -117,11 +117,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            p.name AS productName,
            COALESCE(SUM(oi.quantity), 0) AS totalQuantitySold,
            COUNT(DISTINCT o.id) AS orderCount
-    FROM order_items oi
-    JOIN product_variants pv ON oi.product_variant_id = pv.id
+    FROM order_item oi
+    JOIN product_variant pv ON oi.product_variant_id = pv.id
     JOIN products p ON pv.product_id = p.id
     JOIN orders o ON oi.order_id = o.id
-    WHERE o.status = ''COMPLETED''
+    WHERE o.status = 'COMPLETED'
     GROUP BY p.id, p.name
     ORDER BY COALESCE(SUM(oi.quantity), 0) DESC
 """,
@@ -136,11 +136,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            COALESCE(SUM(oi.quantity), 0) AS totalQuantitySold,
            COUNT(DISTINCT o.id) AS orderCount,
            COALESCE(SUM(oi.quantity * oi.price), 0) AS totalRevenue
-    FROM order_items oi
-    JOIN product_variants pv ON oi.product_variant_id = pv.id
+    FROM order_item oi
+    JOIN product_variant pv ON oi.product_variant_id = pv.id
     JOIN products p ON pv.product_id = p.id
     JOIN orders o ON oi.order_id = o.id
-    WHERE o.status = ''COMPLETED''
+    WHERE o.status = 'COMPLETED'
     GROUP BY p.id, p.name
     ORDER BY COALESCE(SUM(oi.quantity), 0) DESC
 """,
@@ -155,11 +155,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            COALESCE(SUM(oi.quantity), 0) AS totalQuantitySold,
            COUNT(DISTINCT o.id) AS orderCount,
            COALESCE(SUM(oi.quantity * oi.price), 0) AS totalRevenue
-    FROM order_items oi
-    JOIN product_variants pv ON oi.product_variant_id = pv.id
+    FROM order_item oi
+    JOIN product_variant pv ON oi.product_variant_id = pv.id
     JOIN products p ON pv.product_id = p.id
     JOIN orders o ON oi.order_id = o.id
-    WHERE o.status = ''COMPLETED''
+    WHERE o.status = 'COMPLETED'
       AND o.created_at >= :startDate
       AND o.created_at < :endDate
     GROUP BY p.id, p.name

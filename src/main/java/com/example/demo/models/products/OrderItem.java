@@ -1,6 +1,7 @@
 package com.example.demo.models.products;
 
 import com.example.demo.models.Order;
+import com.example.demo.Enums.DiscountType;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
@@ -32,9 +33,18 @@ public class OrderItem {
     private ProductVariant productVariant;
 
     @Min(0)
+    private BigDecimal originalPrice;
+
+    @Min(0)
     private BigDecimal price;
 
     @Min(0)
     private Integer quantity;
+
+    @Min(0)
+    private BigDecimal productDiscountAmount;
+
+    @Enumerated(EnumType.STRING)
+    private DiscountType productDiscountType;
 
 }

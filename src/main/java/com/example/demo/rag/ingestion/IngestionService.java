@@ -1,11 +1,13 @@
 package com.example.demo.rag.ingestion;
 
 import com.example.demo.dto.product.ProductDetailDto;
+import com.example.demo.dto.product.ProductVariantDto;
 import com.example.demo.rag.chunking.Chunk;
 import com.example.demo.rag.chunking.ChunkingService;
 import com.example.demo.rag.embbeding.EmbeddingService;
 import com.example.demo.rag.semantic.SemanticBuilderService;
 import io.qdrant.client.QdrantClient;
+import io.qdrant.client.grpc.Common;
 import io.qdrant.client.grpc.Points.PointStruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
@@ -40,11 +43,7 @@ public class IngestionService {
     @Value("${qdrant.collection-name:product_variants}")
     private String collectionName;
 
-    /**
-     * Ingest a single product into the vector database
-     * @param product Product to ingest
-     * @return List of ingestion documents created
-     */
+
     public List<IngestionDocument> ingestProduct(ProductDetailDto product) {
         if (product == null) {
             log.warn("Null product provided for ingestion");
@@ -54,15 +53,24 @@ public class IngestionService {
         log.info("Starting ingestion for product: {} (ID: {})", product.name(), product.id());
 
         try {
+            // Ensure stale chunks are removed before creating new semantic chunks.
+            if (product.id() != null) {
+                qdrantClient.deleteAsync(collectionName, buildProductFilter(product.id())).get();
+                log.info("Deleted existing vector points for product {}", product.id());
+            }
+
             // Step 1: Build semantic text
-            String semanticText = semanticBuilderService.buildSemanticText(product);
+            String semanticText = buildSemanticTextForIngestion(product);
             log.debug("Generated semantic text of length: {}", semanticText.length());
 
             // Step 2: Chunk the semantic text
             List<Chunk> chunks = chunkingService.chunkTextWithMetadata(semanticText);
             log.info("Created {} chunks for product {}", chunks.size(), product.id());
 
-            // Step 3: Generate embeddings and create documents
+            // Step 3: Calculate price range
+            PriceRange priceRange = calculatePriceRange(product);
+
+            // Step 4: Generate embeddings and create documents
             List<IngestionDocument> documents = new ArrayList<>();
             List<PointStruct> points = new ArrayList<>();
 
@@ -84,6 +92,9 @@ public class IngestionService {
                         .type(product.productType())
                         .tokenCount(chunk.getTokenCount())
                         .sentenceCount(chunk.getSentenceCount())
+                        .minPrice(priceRange.minPrice())
+                        .maxPrice(priceRange.maxPrice())
+                        .text(semanticText)
                         .build();
 
                 // Create ingestion document
@@ -107,7 +118,7 @@ public class IngestionService {
                 log.debug("Created document {} with {} tokens", docId, chunk.getTokenCount());
             }
 
-            // Step 4: Upsert to Qdrant
+            // Step 5: Upsert to Qdrant
             if (!points.isEmpty()) {
                 qdrantClient.upsertAsync(collectionName, points).get();
                 log.info("Successfully ingested {} chunks for product {} into Qdrant", 
@@ -125,7 +136,7 @@ public class IngestionService {
             throw new IngestionException("Failed to ingest product", e);
         } catch (Exception e) {
             log.error("Unexpected error during ingestion for product {}", product.id(), e);
-            throw new IngestionException("Unexpected error during ingestion", e);
+            throw new IngestionException("Unexpected ingestion error", e);
         }
     }
 
@@ -136,7 +147,7 @@ public class IngestionService {
      */
     public List<IngestionDocument> ingestBatch(List<ProductDetailDto> products) {
         if (products == null || products.isEmpty()) {
-            log.warn("Empty product list provided for batch ingestion");
+            log.warn("Empty or null product list provided for batch ingestion");
             return new ArrayList<>();
         }
 
@@ -174,14 +185,18 @@ public class IngestionService {
         }
 
         try {
-            // Delete all chunks for this product
-            // Qdrant filter: productId == productId
             log.info("Deleting product {} from vector database", productId);
-            
-            // Note: This requires implementing a filter-based delete
-            // For now, we'll log a warning
-            log.warn("Delete by filter not implemented. Manual cleanup required for product {}", productId);
-            
+
+            qdrantClient.deleteAsync(collectionName, buildProductFilter(productId)).get();
+            log.info("Deleted vector points for product {}", productId);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Delete interrupted for product {}", productId, e);
+            throw new IngestionException("Delete interrupted", e);
+        } catch (ExecutionException e) {
+            log.error("Failed to delete product {} from vector database", productId, e);
+            throw new IngestionException("Failed to delete product from vector database", e);
         } catch (Exception e) {
             log.error("Failed to delete product {}", productId, e);
             throw new IngestionException("Failed to delete product", e);
@@ -198,7 +213,7 @@ public class IngestionService {
             return new IngestionStats(0, 0, 0, 0, 0);
         }
 
-        String semanticText = semanticBuilderService.buildSemanticText(product);
+        String semanticText = buildSemanticTextForIngestion(product);
         List<Chunk> chunks = chunkingService.chunkTextWithMetadata(semanticText);
 
         int totalChunks = chunks.size();
@@ -214,6 +229,80 @@ public class IngestionService {
                 embeddingDimension,
                 estimatedVectorSize
         );
+    }
+
+    /**
+     * Calculate min and max price from product variants
+     * @param product Product to analyze
+     * @return PriceRange containing min and max prices
+     */
+    private PriceRange calculatePriceRange(ProductDetailDto product) {
+        if (product.productVariants() == null || product.productVariants().isEmpty()) {
+            return new PriceRange(null, null);
+        }
+
+        Double minPrice = null;
+        Double maxPrice = null;
+
+        for (ProductVariantDto variant : product.productVariants()) {
+            Double price = variant.discountedPrice() != null ? variant.discountedPrice() : variant.originalPrice();
+            
+            if (price != null) {
+                if (minPrice == null || price < minPrice) {
+                    minPrice = price;
+                }
+                if (maxPrice == null || price > maxPrice) {
+                    maxPrice = price;
+                }
+            }
+        }
+
+        return new PriceRange(minPrice, maxPrice);
+    }
+
+    private String buildSemanticTextForIngestion(ProductDetailDto product) {
+        String semanticText = semanticBuilderService.buildSemanticText(product);
+        if (semanticText != null && !semanticText.isBlank()) {
+            return semanticText;
+        }
+
+        StringBuilder fallback = new StringBuilder();
+        if (product.name() != null && !product.name().isBlank()) {
+            fallback.append(product.name());
+        }
+        if (product.brand() != null && !product.brand().isBlank()) {
+            if (!fallback.isEmpty()) {
+                fallback.append(". ");
+            }
+            fallback.append("Brand: ").append(product.brand());
+        }
+        if (product.productType() != null && !product.productType().isBlank()) {
+            if (!fallback.isEmpty()) {
+                fallback.append(". ");
+            }
+            fallback.append("Type: ").append(product.productType().trim().toUpperCase(Locale.ROOT));
+        }
+        if (product.description() != null && !product.description().isBlank()) {
+            if (!fallback.isEmpty()) {
+                fallback.append(". ");
+            }
+            fallback.append(product.description());
+        }
+
+        if (product.productAttributes() != null && !product.productAttributes().isEmpty()) {
+            product.productAttributes().forEach((key, value) -> {
+                if (key != null && !key.isBlank() && value != null && !value.toString().isBlank()) {
+                    fallback.append(". ").append(key).append(": ").append(value);
+                }
+            });
+        }
+
+        if (!fallback.isEmpty()) {
+            log.warn("Semantic text empty for product {}, using ingestion fallback text", product.id());
+            return fallback.toString();
+        }
+
+        throw new IngestionException("Cannot build semantic text for product " + product.id());
     }
 
     /**
@@ -235,6 +324,12 @@ public class IngestionService {
         if (payload.getSentenceCount() != null) {
             map.put("sentenceCount", value(payload.getSentenceCount()));
         }
+        if (payload.getMinPrice() != null) {
+            map.put("minPrice", value(payload.getMinPrice()));
+        }
+        if (payload.getMaxPrice() != null) {
+            map.put("maxPrice", value(payload.getMaxPrice()));
+        }
         
         return map;
     }
@@ -255,6 +350,54 @@ public class IngestionService {
             return Integer.toUnsignedLong((productId + "-" + chunkIndex).hashCode());
         }
     }
+
+    /**
+     * Extract basic description from semantic text
+     * Returns only the product description part, excluding use cases and categories
+     */
+    private String extractBasicDescription(String semanticText) {
+        if (semanticText == null || semanticText.isBlank()) {
+            return semanticText;
+        }
+        
+        // Find the first occurrence of section markers
+        int bestForIndex = semanticText.indexOf("\nBest for:");
+        int categoryIndex = semanticText.indexOf("\nCategory:");
+        
+        // Determine where to cut
+        int cutIndex = -1;
+        if (bestForIndex != -1 && categoryIndex != -1) {
+            cutIndex = Math.min(bestForIndex, categoryIndex);
+        } else if (bestForIndex != -1) {
+            cutIndex = bestForIndex;
+        } else if (categoryIndex != -1) {
+            cutIndex = categoryIndex;
+        }
+        
+        // Extract basic description
+        if (cutIndex != -1) {
+            return semanticText.substring(0, cutIndex).trim();
+        }
+        
+        return semanticText.trim();
+    }
+    private Common.Filter buildProductFilter(Long productId) {
+        return Common.Filter.newBuilder()
+                .addMust(Common.Condition.newBuilder()
+                        .setField(Common.FieldCondition.newBuilder()
+                                .setKey("productId")
+                                .setMatch(Common.Match.newBuilder()
+                                        .setInteger(productId)
+                                        .build())
+                                .build())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Price range record
+     */
+    private record PriceRange(Double minPrice, Double maxPrice) {}
 
     /**
      * Statistics about ingestion

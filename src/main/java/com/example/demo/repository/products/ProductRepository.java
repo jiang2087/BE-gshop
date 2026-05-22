@@ -13,15 +13,16 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
-    @Query("SELECT DISTINCT LOWER(TRIM(p.brand)) FROM Product p WHERE p.brand IS NOT NULL AND TRIM(p.brand) <> ''")
-    List<String> findDistinctNormalizedBrands();
+
 
     @Query("""
+
                 SELECT p.name FROM Product p WHERE p.id in :ids
             """)
     List<String> findByIds(@Param("ids") List<Long> ids);
 
     @Query("""
+
                 SELECT p
                 FROM Product p
                 JOIN p.productVariants v
@@ -38,6 +39,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     );
 
     @Query("""
+
                 SELECT p
                 FROM Product p
                 JOIN p.productVariants v
@@ -57,12 +59,20 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("SELECT p FROM Product p WHERE TYPE(p) IN :type")
     Page<Product> findByType(@Param("type") List<? extends Class<? extends Product>> type, Pageable pageable);
 
-
     @Query(value = """
+
     SELECT p.id
     FROM products p
-    WHERE MATCH(p.name, p.brand) AGAINST(:keyword IN BOOLEAN MODE)
-    ORDER BY MATCH(p.name, p.brand) AGAINST(:keyword IN BOOLEAN MODE) DESC
+    WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+       OR LOWER(p.brand) LIKE LOWER(CONCAT('%', :keyword, '%'))
+       OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+    ORDER BY 
+      CASE 
+        WHEN LOWER(p.name) LIKE LOWER(CONCAT(:keyword, '%')) THEN 1
+        WHEN LOWER(p.brand) LIKE LOWER(CONCAT(:keyword, '%')) THEN 2
+        ELSE 3
+      END,
+      CHAR_LENGTH(p.name) ASC
     """,
             nativeQuery = true)
     Page<Long> searchIds(
@@ -70,4 +80,3 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             Pageable pageable
     );
 }
-

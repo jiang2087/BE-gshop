@@ -5,6 +5,7 @@ import com.example.demo.dto.request.ProductRequest;
 import com.example.demo.dto.request.VariantRequest;
 import com.example.demo.models.Product;
 import com.example.demo.models.products.ProductVariant;
+import com.example.demo.services.ai.QdrantSearchService;
 import com.example.demo.services.products.ProductVariantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +24,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
     private final ProductVariantService productVariantService;
+    private final QdrantSearchService qdrantSearchService;
 
     @GetMapping
     public ResponseEntity<Page<ProductDetailDto>> getAllProducts(Pageable pageable) {
-
 
         return ResponseEntity.ok(productVariantService.getAllProducts(pageable));
     }
@@ -40,6 +41,30 @@ public class ProductController {
     public ResponseEntity<ProductDetailDto> getProductById(@PathVariable long id) {
         return ResponseEntity.ok(productVariantService.getProductById(id));
     }
+
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<List<ProductDetailDto>> getSimilarProducts(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        List<ProductDetailDto> similarProducts = qdrantSearchService.findSimilarProducts(id, limit);
+        return ResponseEntity.ok(similarProducts);
+    }
+    @GetMapping("/search/text")
+    public ResponseEntity<List<Product>> searchByText(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) Float scoreThreshold
+    ) {
+        List<Product> results;
+        if (scoreThreshold != null) {
+            results = qdrantSearchService.searchByTextWithThreshold(query, limit, scoreThreshold);
+        } else {
+            results = qdrantSearchService.searchByText(query, limit);
+        }
+        return ResponseEntity.ok(results);
+    }
+
 
     @GetMapping("/type")
     public ResponseEntity<?> getProductByType(@RequestParam List<String> types, Pageable pageable) {
@@ -145,4 +170,3 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 }
-

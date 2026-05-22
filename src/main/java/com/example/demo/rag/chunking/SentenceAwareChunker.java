@@ -2,6 +2,7 @@ package com.example.demo.rag.chunking;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,28 +10,27 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/**
- * Sentence-aware text chunking implementation
- * Splits text into chunks while preserving sentence boundaries
- */
+
 @Slf4j
 @Component
 public class SentenceAwareChunker implements TextChunker {
 
     private final ChunkingConfig config;
-    // Sentence boundary patterns
+
+    // Sentence boundary patterns (fallback)
     private static final Pattern SENTENCE_PATTERN = Pattern.compile(
-        "[^.!?\\u3002\\uff01\\uff1f]+[.!?\\u3002\\uff01\\uff1f]+[\"\')\\]\\}]*\\s*"
+            "[^.!?\\u3002\\uff01\\uff1f]+[.!?\\u3002\\uff01\\uff1f]+[\"')\\]}]*\\s*"
     );
     
     private final int chunkSize;
     private final int overlap;
 
+    @Autowired
     public SentenceAwareChunker(ChunkingConfig config) {
         this.config = config;
         this.chunkSize = config.getChunkSize();
         this.overlap = config.getOverlap();
-        log.info("Initialized SentenceAwareChunker with chunkSize={}, overlap={}", 
+        log.info("Initialized SentenceAwareChunker with chunkSize={}, overlap={}",
                 this.chunkSize, this.overlap);
     }
 
@@ -41,6 +41,7 @@ public class SentenceAwareChunker implements TextChunker {
                 .map(Chunk::getContent)
                 .toList();
     }
+    
     @Override
     public List<Chunk> chunkWithMetadata(String text) {
 
@@ -95,24 +96,33 @@ public class SentenceAwareChunker implements TextChunker {
             int start,
             int end
     ) {}
-
     private List<SentenceSpan> splitIntoSentenceSpans(String text) {
-
         List<SentenceSpan> result = new ArrayList<>();
-
-        Matcher matcher = Pattern.compile("[^.!?]+[.!?]?").matcher(text);
-
+        
+        Matcher matcher = SENTENCE_PATTERN.matcher(text);
+        
         while (matcher.find()) {
-
-            result.add(new SentenceSpan(
-                    matcher.group().trim(),
-                    matcher.start(),
-                    matcher.end()
-            ));
+            int start = matcher.start();
+            int end = matcher.end();
+            String sentence = text.substring(start, end).trim();
+            
+            if (!sentence.isEmpty()) {
+                result.add(new SentenceSpan(
+                        sentence,
+                        start,
+                        end
+                ));
+            }
         }
-
+        
+        // Fallback: if no sentences found, treat entire text as one sentence
+        if (result.isEmpty() && !text.isBlank()) {
+            result.add(new SentenceSpan(text.trim(), 0, text.length()));
+        }
+        
         return result;
     }
+    
     private Chunk buildChunk(List<SentenceSpan> sentences, int index) {
 
         int start = sentences.getFirst().start();
@@ -146,6 +156,7 @@ public class SentenceAwareChunker implements TextChunker {
 
         return new ArrayList<>(buffer.subList(from, buffer.size()));
     }
+    
     private int estimateTokens(String text) {
         if (text == null || text.isBlank()) {
             return 0;

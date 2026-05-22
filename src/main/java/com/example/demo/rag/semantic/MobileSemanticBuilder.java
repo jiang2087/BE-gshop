@@ -3,8 +3,11 @@ package com.example.demo.rag.semantic;
 import com.example.demo.dto.product.ProductDetailDto;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.Set;
+
 @Component
-public class MobileSemanticBuilder implements ProductSemanticBuilder {
+public class MobileSemanticBuilder extends AbstractSemanticBuilder {
 
     @Override
     public boolean supports(String productType) {
@@ -18,7 +21,7 @@ public class MobileSemanticBuilder implements ProductSemanticBuilder {
         sb.append(product.name()).append(" mobile phone by ").append(product.brand()).append(".\n");
 
         var attrs = product.productAttributes();
-        if (attrs != null) {
+        if (hasAttributes(attrs)) {
             appendIfPresent(sb, attrs.get("model"), attrs.get("model") + " model.\n");
             appendIfPresent(sb, attrs.get("screenSize"), attrs.get("screenSize") + " inch screen.\n");
             appendIfPresent(sb, attrs.get("resolution"), attrs.get("resolution") + " resolution.\n");
@@ -27,127 +30,91 @@ public class MobileSemanticBuilder implements ProductSemanticBuilder {
             appendIfPresent(sb, attrs.get("dimension"), attrs.get("dimension") + " dimension.\n");
         }
 
-        appendUseCases(sb, attrs);
-        appendCategory(sb, attrs);
+        Set<String> useCases = buildUseCases(attrs);
+        appendUseCasesSection(sb, useCases);
+        
+        Set<String> categories = buildCategories(attrs);
+        appendCategorySection(sb, categories);
 
         return sb.toString().trim();
     }
 
-    private void appendUseCases(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildUseCases(Map<String, Object> attrs) {
+        Set<String> useCases = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            return useCases;
         }
 
-        java.util.Set<String> useCases = new java.util.LinkedHashSet<>();
+        String camera = safe(getAttribute(attrs, "camera")).toLowerCase();
+        String battery = safe(getAttribute(attrs, "battery")).toLowerCase();
+        String resolution = safe(getAttribute(attrs, "resolution")).toLowerCase();
+        double screenSize = parseDouble(getAttribute(attrs, "screenSize"), 0);
 
-        String camera = safe(attrs.get("camera")).toLowerCase();
-        String battery = safe(attrs.get("battery")).toLowerCase();
-        String resolution = safe(attrs.get("resolution")).toLowerCase();
-        Object screenSizeObj = attrs.get("screenSize");
-
-        if (camera.contains("108mp") || camera.contains("200mp") ||
-            camera.contains("50mp") || camera.contains("64mp")) {
+        if (containsAny(camera, "108mp", "200mp", "50mp", "64mp")) {
             useCases.add("high-quality photography");
             useCases.add("high-quality video recording");
             useCases.add("content creation");
         }
 
-        if (battery.contains("5000") || battery.contains("6000") ||
-            battery.contains("7000")) {
+        if (containsAny(battery, "5000", "6000", "7000")) {
             useCases.add("heavy daily usage");
             useCases.add("long battery life");
             useCases.add("travel");
         }
 
-        if (resolution.contains("2k") || resolution.contains("4k") ||
-            resolution.contains("quad hd") || resolution.contains("qhd")) {
+        if (containsAny(resolution, "2k", "4k", "quad hd", "qhd")) {
             useCases.add("high-quality streaming");
             useCases.add("gaming");
         }
 
-        if (screenSizeObj != null) {
-            try {
-                double screenSize = Double.parseDouble(screenSizeObj.toString());
-                if (screenSize >= 6.5) {
-                    useCases.add("entertainment");
-                    useCases.add("video watching");
-                } else if (screenSize <= 6.0) {
-                    useCases.add("compact one-hand use");
-                }
-            } catch (NumberFormatException ignored) {
-            }
+        if (screenSize >= 6.5) {
+            useCases.add("entertainment");
+            useCases.add("video watching");
+        } else if (screenSize > 0 && screenSize <= 6.0) {
+            useCases.add("compact one-hand use");
         }
 
-        if (camera.contains("12mp") || camera.contains("16mp")) {
+        if (containsAny(camera, "12mp", "16mp")) {
             useCases.add("daily photography");
         }
 
-        if (!useCases.isEmpty()) {
-            sb.append("\nBest for:\n");
-            for (String useCase : useCases) {
-                sb.append("- ").append(useCase).append("\n");
-            }
-        }
+        return useCases;
     }
 
-    private void appendCategory(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildCategories(Map<String, Object> attrs) {
+        Set<String> categories = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            categories.add("standard smartphone");
+            return categories;
         }
 
-        java.util.Set<String> categories = new java.util.LinkedHashSet<>();
+        String camera = safe(getAttribute(attrs, "camera")).toLowerCase();
+        String battery = safe(getAttribute(attrs, "battery")).toLowerCase();
+        String resolution = safe(getAttribute(attrs, "resolution")).toLowerCase();
+        double screenSize = parseDouble(getAttribute(attrs, "screenSize"), 0);
 
-        String camera = safe(attrs.get("camera")).toLowerCase();
-        String battery = safe(attrs.get("battery")).toLowerCase();
-        String resolution = safe(attrs.get("resolution")).toLowerCase();
-        Object screenSizeObj = attrs.get("screenSize");
-
-        if ((camera.contains("108mp") || camera.contains("200mp") || camera.contains("64mp")) &&
-            (resolution.contains("2k") || resolution.contains("4k"))) {
+        if (containsAny(camera, "108mp", "200mp", "64mp") && containsAny(resolution, "2k", "4k")) {
             categories.add("premium smartphone");
             categories.add("flagship phone");
         }
-        else if ((camera.contains("48mp") || camera.contains("50mp")) &&
-                 (battery.contains("4000") || battery.contains("5000"))) {
+        else if (containsAny(camera, "48mp", "50mp") && containsAny(battery, "4000", "5000")) {
             categories.add("mid-range smartphone");
             categories.add("value phone");
         }
-        else if (camera.contains("12mp") || camera.contains("13mp") || camera.contains("16mp")) {
+        else if (containsAny(camera, "12mp", "13mp", "16mp")) {
             categories.add("entry-level smartphone");
             categories.add("budget phone");
         }
-        else if (screenSizeObj != null) {
-            try {
-                double screenSize = Double.parseDouble(screenSizeObj.toString());
-                if (screenSize >= 6.7) {
-                    categories.add("large-screen smartphone");
-                    categories.add("entertainment phone");
-                } else {
-                    categories.add("standard smartphone");
-                }
-            } catch (NumberFormatException ignored) {
-                categories.add("standard smartphone");
-            }
+        else if (screenSize >= 6.7) {
+            categories.add("large-screen smartphone");
+            categories.add("entertainment phone");
         }
         else {
             categories.add("standard smartphone");
         }
 
-        if (!categories.isEmpty()) {
-            sb.append("\nCategory:\n");
-            for (String category : categories) {
-                sb.append(category).append("\n");
-            }
-        }
-    }
-
-    private void appendIfPresent(StringBuilder sb, Object value, String text) {
-        if (value != null && !value.toString().trim().isEmpty()) {
-            sb.append(text);
-        }
-    }
-
-    private String safe(Object value) {
-        return value != null ? value.toString() : "";
+        return categories;
     }
 }

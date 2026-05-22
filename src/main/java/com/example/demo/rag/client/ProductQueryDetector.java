@@ -18,14 +18,20 @@ public class ProductQueryDetector {
 
     // Product-related action phrases (more specific)
     private static final List<Pattern> PRODUCT_INTENT_PATTERNS = List.of(
-            Pattern.compile("\\b(tim|tìm|search|find|show|hien thi|hiển thị)\\s+(san pham|sản phẩm|product)"),
+            Pattern.compile("\\b(tim|tìm|search|find|show|hien thi|hiển thị|cho toi xem|cho tôi xem)\\s+(san pham|sản phẩm|product)"),
             Pattern.compile("\\b(mua|buy|purchase)\\s+(san pham|sản phẩm|product|laptop|phone|mobile)"),
             Pattern.compile("\\b(gia|giá|price|cost)\\s+(cua|của|of|for)\\s+\\w+"),
             Pattern.compile("\\b(san pham|sản phẩm|product)\\s+(nao|nào|which|what)"),
             Pattern.compile("\\b(co|có|have|available)\\s+(san pham|sản phẩm|product)"),
-            Pattern.compile("\\b(khuyen mai|khuy?n m�i|promotion|discount|giam gia|gi?m gi�)"),
-            Pattern.compile("\\b(ban chay|b�n ch?y|best selling|top selling|popular|pho bien|ph? bi?n)\\s+(san pham|s?n ph?m|product)?"),
-            Pattern.compile("\\b(variant|sku|model)\\s+\\w+")
+            Pattern.compile("\\b(khuyen mai|khuyến mãi|promotion|discount|giam gia|giảm giá)"),
+            Pattern.compile("\\b(ban chay|bán chạy|best selling|top selling|popular|pho bien|phổ biến)\\s+(san pham|sản phẩm|product)?"),
+            Pattern.compile("\\b(variant|sku|model)\\s+\\w+"),
+            // Price-related patterns
+            Pattern.compile("\\b(dat nhat|đắt nhất|most expensive|highest price|gia cao nhat|giá cao nhất)"),
+            Pattern.compile("\\b(re nhat|rẻ nhất|cheapest|lowest price|gia thap nhat|giá thấp nhất)"),
+            Pattern.compile("\\b(gia|giá|price)\\s+(cao|thap|thấp|high|low)"),
+            Pattern.compile("\\b(sap xep|sắp xếp|sort|order)\\s+(theo|by)\\s+(gia|giá|price)"),
+            Pattern.compile("\\b(san pham|sản phẩm|product)\\s+(dat|đắt|re|rẻ|expensive|cheap)")
     );
 
     public boolean isProductRelatedQuery(String userQuery) {
@@ -49,7 +55,6 @@ public class ProductQueryDetector {
         // Check if query matches product intent patterns
         boolean hasProductIntent = PRODUCT_INTENT_PATTERNS.stream()
                 .anyMatch(pattern -> pattern.matcher(normalized).find());
-
         return hasProductCategory || hasProductIntent;
     }
 }

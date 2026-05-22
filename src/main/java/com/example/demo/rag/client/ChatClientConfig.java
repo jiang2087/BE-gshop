@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
+import java.math.BigDecimal;
 
 @Configuration
 @ConfigurationProperties(prefix = "chat.client")
@@ -15,4 +16,5 @@ public class ChatClientConfig {
     private int maxRetryAttempts = 3;
     private Duration retryDelay = Duration.ofSeconds(2);
     private Duration requestTimeout = Duration.ofSeconds(30);
+    private BigDecimal vndToUsdRate = new BigDecimal("26000");
 }

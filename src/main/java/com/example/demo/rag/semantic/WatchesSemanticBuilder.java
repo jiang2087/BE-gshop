@@ -3,8 +3,11 @@ package com.example.demo.rag.semantic;
 import com.example.demo.dto.product.ProductDetailDto;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.Set;
+
 @Component
-public class WatchesSemanticBuilder implements ProductSemanticBuilder {
+public class WatchesSemanticBuilder extends AbstractSemanticBuilder {
 
     @Override
     public boolean supports(String productType) {
@@ -18,14 +21,14 @@ public class WatchesSemanticBuilder implements ProductSemanticBuilder {
         sb.append(product.name()).append(" smartwatch by ").append(product.brand()).append(".\n");
 
         var attrs = product.productAttributes();
-        if (attrs != null) {
+        if (hasAttributes(attrs)) {
             appendIfPresent(sb, attrs.get("model"), attrs.get("model") + " model.\n");
             appendIfPresent(sb, attrs.get("gender"), "Designed for " + attrs.get("gender") + ".\n");
             appendIfPresent(sb, attrs.get("screenSize"), attrs.get("screenSize") + " inch screen.\n");
 
-            Object gpsObj = attrs.get("gps");
+            Object gpsObj = getAttribute(attrs, "gps");
             if (gpsObj != null) {
-                boolean hasGps = Boolean.parseBoolean(gpsObj.toString());
+                boolean hasGps = parseBoolean(gpsObj, false);
                 sb.append(hasGps ? "With GPS.\n" : "Without GPS.\n");
             }
 
@@ -34,61 +37,51 @@ public class WatchesSemanticBuilder implements ProductSemanticBuilder {
             appendIfPresent(sb, attrs.get("material"), attrs.get("material") + " material.\n");
         }
 
-        appendUseCases(sb, attrs);
-        appendCategory(sb, attrs);
+        Set<String> useCases = buildUseCases(attrs);
+        appendUseCasesSection(sb, useCases);
+        
+        Set<String> categories = buildCategories(attrs);
+        appendCategorySection(sb, categories);
 
         return sb.toString().trim();
     }
 
-    private void appendUseCases(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildUseCases(Map<String, Object> attrs) {
+        Set<String> useCases = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            return useCases;
         }
 
-        java.util.Set<String> useCases = new java.util.LinkedHashSet<>();
+        String material = safe(getAttribute(attrs, "material")).toLowerCase();
+        String gender = safe(getAttribute(attrs, "gender")).toLowerCase();
+        boolean hasGps = parseBoolean(getAttribute(attrs, "gps"), false);
+        double batteryLife = parseDouble(getAttribute(attrs, "batteryLife"), 0);
+        double screenSize = parseDouble(getAttribute(attrs, "screenSize"), 0);
 
-        String material = safe(attrs.get("material")).toLowerCase();
-        String gender = safe(attrs.get("gender")).toLowerCase();
-        Object gpsObj = attrs.get("gps");
-        Object batteryLifeObj = attrs.get("batteryLife");
-        Object screenSizeObj = attrs.get("screenSize");
-
-        if (gpsObj != null && Boolean.parseBoolean(gpsObj.toString())) {
+        if (hasGps) {
             useCases.add("running");
             useCases.add("hiking");
             useCases.add("outdoor activities");
         }
 
-        if (batteryLifeObj != null) {
-            try {
-                double batteryLife = Double.parseDouble(batteryLifeObj.toString());
-                if (batteryLife >= 7) {
-                    useCases.add("long-term use");
-                    useCases.add("travel");
-                }
-            } catch (NumberFormatException ignored) {
-            }
+        if (batteryLife >= 7) {
+            useCases.add("long-term use");
+            useCases.add("travel");
         }
 
-        if (material.contains("titanium") || material.contains("sapphire") ||
-            material.contains("ceramic")) {
+        if (containsAny(material, "titanium", "sapphire", "ceramic")) {
             useCases.add("premium style");
             useCases.add("high durability");
         }
 
-        if (material.contains("stainless") || material.contains("steel")) {
+        if (containsAny(material, "stainless", "steel")) {
             useCases.add("daily wear");
             useCases.add("sporty style");
         }
 
-        if (screenSizeObj != null) {
-            try {
-                double screenSize = Double.parseDouble(screenSizeObj.toString());
-                if (screenSize >= 1.7) {
-                    useCases.add("easy readability");
-                }
-            } catch (NumberFormatException ignored) {
-            }
+        if (screenSize >= 1.7) {
+            useCases.add("easy readability");
         }
 
         if (!gender.isEmpty()) {
@@ -104,37 +97,23 @@ public class WatchesSemanticBuilder implements ProductSemanticBuilder {
         useCases.add("health tracking");
         useCases.add("activity tracking");
 
-        if (!useCases.isEmpty()) {
-            sb.append("\nBest for:\n");
-            for (String useCase : useCases) {
-                sb.append("- ").append(useCase).append("\n");
-            }
-        }
+        return useCases;
     }
 
-    private void appendCategory(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildCategories(Map<String, Object> attrs) {
+        Set<String> categories = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            categories.add("entry-level smartwatch");
+            categories.add("basic smartwatch");
+            return categories;
         }
 
-        java.util.Set<String> categories = new java.util.LinkedHashSet<>();
+        String material = safe(getAttribute(attrs, "material")).toLowerCase();
+        boolean hasGps = parseBoolean(getAttribute(attrs, "gps"), false);
+        double batteryLife = parseDouble(getAttribute(attrs, "batteryLife"), 0);
 
-        String material = safe(attrs.get("material")).toLowerCase();
-        Object gpsObj = attrs.get("gps");
-        Object batteryLifeObj = attrs.get("batteryLife");
-
-        boolean hasGps = gpsObj != null && Boolean.parseBoolean(gpsObj.toString());
-
-        double batteryLife = 0;
-        if (batteryLifeObj != null) {
-            try {
-                batteryLife = Double.parseDouble(batteryLifeObj.toString());
-            } catch (NumberFormatException ignored) {
-            }
-        }
-
-        if ((material.contains("titanium") || material.contains("sapphire") || material.contains("ceramic")) &&
-            hasGps && batteryLife >= 7) {
+        if (containsAny(material, "titanium", "sapphire", "ceramic") && hasGps && batteryLife >= 7) {
             categories.add("premium smartwatch");
             categories.add("luxury smartwatch");
         }
@@ -142,7 +121,7 @@ public class WatchesSemanticBuilder implements ProductSemanticBuilder {
             categories.add("sports smartwatch");
             categories.add("fitness watch");
         }
-        else if (material.contains("stainless") || material.contains("aluminum")) {
+        else if (containsAny(material, "stainless", "aluminum")) {
             categories.add("everyday smartwatch");
             categories.add("casual smartwatch");
         }
@@ -155,21 +134,6 @@ public class WatchesSemanticBuilder implements ProductSemanticBuilder {
             categories.add("basic smartwatch");
         }
 
-        if (!categories.isEmpty()) {
-            sb.append("\nCategory:\n");
-            for (String category : categories) {
-                sb.append(category).append("\n");
-            }
-        }
-    }
-
-    private void appendIfPresent(StringBuilder sb, Object value, String text) {
-        if (value != null && !value.toString().trim().isEmpty()) {
-            sb.append(text);
-        }
-    }
-
-    private String safe(Object value) {
-        return value != null ? value.toString() : "";
+        return categories;
     }
 }

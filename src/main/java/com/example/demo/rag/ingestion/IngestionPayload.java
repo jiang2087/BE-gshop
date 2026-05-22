@@ -53,4 +53,14 @@ public class IngestionPayload {
      * Number of sentences in the chunk
      */
     private Integer sentenceCount;
+    
+    /**
+     * Minimum price across all product variants
+     */
+    private Double minPrice;
+    
+    /**
+     * Maximum price across all product variants
+     */
+    private Double maxPrice;
 }

@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
 import com.example.demo.Enums.OrderStatus;
+import com.example.demo.Enums.DiscountType;
 import com.example.demo.dto.request.PlaceOrderRequest;
 import com.example.demo.dto.response.OrderAdminResponse;
 import com.example.demo.dto.response.OrderItemResponse;
@@ -13,11 +14,8 @@ import com.example.demo.models.Order;
 import com.example.demo.models.User;
 import com.example.demo.models.products.OrderItem;
 import com.example.demo.models.products.ProductVariant;
-import com.example.demo.repository.AddressRepository;
-import com.example.demo.repository.CartRepository;
-import com.example.demo.repository.OrderRepository;
+import com.example.demo.repository.*;
 
-import com.example.demo.repository.UserRepository;
 import com.example.demo.repository.products.ProductVariantRepository;
 import com.example.demo.services.products.OrderItemService;
 import jakarta.persistence.EntityNotFoundException;
@@ -50,6 +48,7 @@ public class OrderService {
     private final ProductVariantRepository productVariantRepository;
     private final VoucherService voucherService;
     private final CartRepository cartRepository;
+    private final DiscountService discountService;
     private final DateTimeService dateTimeService;
     private final OrderItemService orderItemService;
 
@@ -87,6 +86,9 @@ public class OrderService {
             //Create a map for quick searching by ID)
             Map<Long, ProductVariant> variantMap = variants.stream()
                     .collect(Collectors.toMap(ProductVariant::getId, v -> v));
+            // Get active discounts for all variants
+            Map<Long, DiscountService.DiscountInfo> discountMap = 
+                    discountService.getDiscountsByVariantIds(variantIds);
             for (PlaceOrderRequest.OrderItemRequest itemReq : request.items()) {
                 ProductVariant variant = variantMap.get(itemReq.variantId());
 
@@ -108,16 +110,38 @@ public class OrderService {
                 OrderItem orderItem = new OrderItem();
                 orderItem.setProductVariant(variant);
                 orderItem.setQuantity(itemReq.quantity());
-                orderItem.setPrice(variant.getPrice());   // snapshot price
+                
+                // Apply product discount if available
+                BigDecimal originalPrice = variant.getPrice();
+                BigDecimal finalPrice = originalPrice;
+                BigDecimal discountAmount = BigDecimal.ZERO;
+                
+                DiscountService.DiscountInfo discount = discountMap.get(variant.getId());
+                if (discount != null) {
+                    if (discount.type() == DiscountType.PERCENTAGE) {
+                        discountAmount = originalPrice.multiply(
+                            BigDecimal.valueOf(discount.value() / 100)
+                        );
+                        finalPrice = originalPrice.subtract(discountAmount);
+                    } else {
+                        discountAmount = BigDecimal.valueOf(discount.value());
+                        finalPrice = originalPrice.subtract(discountAmount).max(BigDecimal.ZERO);
+                    }
+                    orderItem.setProductDiscountType(discount.type());
+                    orderItem.setProductDiscountAmount(discountAmount);
+                }
+                
+                orderItem.setOriginalPrice(originalPrice);
+                orderItem.setPrice(finalPrice);
 
                 order.addItem(orderItem);
 
                 // decrease stock
                 variant.setStockQuantity(variant.getStockQuantity() - itemReq.quantity());
 
-                // subtotal
+                // subtotal (using discounted price)
                 subtotal = subtotal.add(
-                        variant.getPrice().multiply(BigDecimal.valueOf(itemReq.quantity()))
+                        finalPrice.multiply(BigDecimal.valueOf(itemReq.quantity()))
                 );
             }
 

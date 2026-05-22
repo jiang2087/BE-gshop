@@ -1,10 +1,15 @@
 package com.example.demo.rag.semantic;
 
 import com.example.demo.dto.product.ProductDetailDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.Set;
+
+@Slf4j
 @Component
-public class LaptopSemanticBuilder implements ProductSemanticBuilder {
+public class LaptopSemanticBuilder extends AbstractSemanticBuilder {
 
     @Override
     public boolean supports(String productType) {
@@ -13,108 +18,119 @@ public class LaptopSemanticBuilder implements ProductSemanticBuilder {
 
     @Override
     public String build(ProductDetailDto product) {
+        log.debug("Building semantic text for laptop: {}", product.name());
         StringBuilder sb = new StringBuilder();
 
         sb.append(product.name()).append(" laptop by ").append(product.brand()).append(".\n");
 
         var attrs = product.productAttributes();
-        if (attrs != null) {
+        if (hasAttributes(attrs)) {
+            log.debug("Product {} has {} attributes: {}", product.id(), attrs.size(), attrs.keySet());
             appendIfPresent(sb, attrs.get("cpu"), attrs.get("cpu") + " processor.\n");
             appendIfPresent(sb, attrs.get("ram"), attrs.get("ram") + " RAM.\n");
             appendIfPresent(sb, attrs.get("gpu"), attrs.get("gpu") + " graphics.\n");
             appendIfPresent(sb, attrs.get("storage"), attrs.get("storage") + " storage.\n");
-            appendIfPresent(sb, attrs.get("screenSize"), attrs.get("screenSize") + " inch display.\n");
+            
+            Object screenSizeObj = attrs.get("screenSize");
+            if (screenSizeObj != null && !screenSizeObj.toString().trim().isEmpty()) {
+                String normalized = normalizeScreenSize(screenSizeObj);
+                sb.append(normalized).append(" inch display.\n");
+            }
+        } else {
+            log.warn("Product {} has null attributes", product.id());
         }
 
-        appendUseCases(sb, attrs);
-        appendCategory(sb, attrs);
+        Set<String> useCases = buildUseCases(attrs);
+        appendUseCasesSection(sb, useCases);
+        
+        Set<String> categories = buildCategories(attrs);
+        appendCategorySection(sb, categories);
 
-        return sb.toString().trim();
+        String result = sb.toString().trim();
+        log.debug("Generated semantic text length: {} chars", result.length());
+        return result;
     }
 
-    private void appendUseCases(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildUseCases(Map<String, Object> attrs) {
+        Set<String> useCases = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            log.debug("Skipping use cases - attrs is null");
+            return useCases;
         }
 
-        java.util.Set<String> useCases = new java.util.LinkedHashSet<>();
+        String gpu = safe(getAttribute(attrs, "gpu")).toLowerCase();
+        String ram = safe(getAttribute(attrs, "ram")).toLowerCase();
+        String cpu = safe(getAttribute(attrs, "cpu")).toLowerCase();
+        double screenSize = parseDouble(getAttribute(attrs, "screenSize"), 0);
 
-        String gpu = safe(attrs.get("gpu")).toLowerCase();
-        String ram = safe(attrs.get("ram")).toLowerCase();
-        String cpu = safe(attrs.get("cpu")).toLowerCase();
-        Object screenSizeObj = attrs.get("screenSize");
+        log.debug("Analyzing use cases - gpu: '{}', ram: '{}', cpu: '{}', screenSize: '{}'", 
+                gpu, ram, cpu, screenSize);
 
-        if (gpu.contains("rtx") || gpu.contains("gtx")) {
+        if (containsAny(gpu, "rtx", "gtx")) {
             useCases.add("gaming");
             useCases.add("graphic design");
             useCases.add("video editing");
         }
 
-        if (ram.contains("16") || ram.contains("32") || ram.contains("64")) {
+        if (containsAny(ram, "16", "32", "64")) {
             useCases.add("multitasking");
         }
 
-        if (gpu.contains("iris") || gpu.contains("uhd") || gpu.contains("integrated")) {
+        if (containsAny(gpu, "iris", "uhd", "integrated")) {
             useCases.add("study");
             useCases.add("office work");
             useCases.add("web browsing");
         }
 
-        if (screenSizeObj != null) {
-            try {
-                double screenSize = Double.parseDouble(screenSizeObj.toString());
-                if (screenSize <= 14) {
-                    useCases.add("frequent travel");
-                    useCases.add("portable work");
-                }
-            } catch (NumberFormatException ignored) {
-            }
+        if (screenSize > 0 && screenSize <= 14) {
+            useCases.add("frequent travel");
+            useCases.add("portable work");
         }
 
-        if (cpu.contains("i3") || cpu.contains("i5") || cpu.contains("ryzen 3") || cpu.contains("ryzen 5")) {
+        if (containsAny(cpu, "i3", "i5", "ryzen 3", "ryzen 5")) {
             useCases.add("basic computing");
         }
 
-        if (cpu.contains("i7") || cpu.contains("i9") || cpu.contains("ryzen 7") || cpu.contains("ryzen 9")) {
+        if (containsAny(cpu, "i7", "i9", "ryzen 7", "ryzen 9")) {
             useCases.add("professional work");
             useCases.add("content creation");
         }
 
-        if (!useCases.isEmpty()) {
-            sb.append("\nBest for:\n");
-            for (String useCase : useCases) {
-                sb.append("- ").append(useCase).append("\n");
-            }
+        log.debug("Found {} use cases: {}", useCases.size(), useCases);
+        if (useCases.isEmpty()) {
+            log.warn("No use cases identified for this laptop");
         }
+
+        return useCases;
     }
 
-    private void appendCategory(StringBuilder sb, java.util.Map<String, Object> attrs) {
-        if (attrs == null) {
-            return;
+    private Set<String> buildCategories(Map<String, Object> attrs) {
+        Set<String> categories = createOrderedSet();
+        
+        if (!hasAttributes(attrs)) {
+            log.debug("Skipping category - attrs is null");
+            return categories;
         }
 
-        java.util.Set<String> categories = new java.util.LinkedHashSet<>();
-        String gpu = safe(attrs.get("gpu")).toLowerCase();
-        String ram = safe(attrs.get("ram")).toLowerCase();
-        String cpu = safe(attrs.get("cpu")).toLowerCase();
+        String gpu = safe(getAttribute(attrs, "gpu")).toLowerCase();
+        String ram = safe(getAttribute(attrs, "ram")).toLowerCase();
+        String cpu = safe(getAttribute(attrs, "cpu")).toLowerCase();
 
-        if ((gpu.contains("rtx") || gpu.contains("gtx")) &&
-            (ram.contains("16") || ram.contains("32") || ram.contains("64"))) {
+        if (containsAny(gpu, "rtx", "gtx") && containsAny(ram, "16", "32", "64")) {
             categories.add("gaming laptop");
             categories.add("high performance laptop");
         }
-        else if ((cpu.contains("i5") || cpu.contains("i7") || cpu.contains("ryzen 5") || cpu.contains("ryzen 7")) &&
-                 (ram.contains("8") || ram.contains("16"))) {
+        else if (containsAny(cpu, "i5", "i7", "ryzen 5", "ryzen 7") && containsAny(ram, "8", "16")) {
             categories.add("mid-range laptop");
             categories.add("office laptop");
             categories.add("study laptop");
         }
-        else if (cpu.contains("i3") || cpu.contains("celeron") || cpu.contains("pentium") ||
-                 cpu.contains("ryzen 3") || cpu.contains("athlon")) {
+        else if (containsAny(cpu, "i3", "celeron", "pentium", "ryzen 3", "athlon")) {
             categories.add("budget laptop");
             categories.add("entry-level laptop");
         }
-        else if (cpu.contains("ultra") || cpu.contains("evo")) {
+        else if (containsAny(cpu, "ultra", "evo")) {
             categories.add("premium ultrabook");
             categories.add("portable laptop");
         }
@@ -122,21 +138,7 @@ public class LaptopSemanticBuilder implements ProductSemanticBuilder {
             categories.add("general-purpose laptop");
         }
 
-        if (!categories.isEmpty()) {
-            sb.append("\nCategory:\n");
-            for (String category : categories) {
-                sb.append(category).append("\n");
-            }
-        }
-    }
-
-    private void appendIfPresent(StringBuilder sb, Object value, String text) {
-        if (value != null && !value.toString().trim().isEmpty()) {
-            sb.append(text);
-        }
-    }
-
-    private String safe(Object value) {
-        return value != null ? value.toString() : "";
+        log.debug("Found {} categories: {}", categories.size(), categories);
+        return categories;
     }
 }

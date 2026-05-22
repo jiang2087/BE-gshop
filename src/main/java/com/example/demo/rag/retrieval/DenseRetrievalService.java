@@ -18,10 +18,6 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-/**
- * Dense Retrieval Service for semantic search using vector embeddings
- * Integrates with Qdrant vector database and Ollama embeddings
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -319,6 +315,8 @@ public class DenseRetrievalService {
         String name = extractString(payload, "name");
         String brand = extractString(payload, "brand");
         String type = normalizeType(extractString(payload, "type"));
+        Double minPrice = extractDouble(payload, "minPrice");
+        Double maxPrice = extractDouble(payload, "maxPrice");
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("tokenCount", extractInteger(payload, "tokenCount"));
@@ -328,6 +326,8 @@ public class DenseRetrievalService {
                 .pointId(point.getId().getNum())
                 .productId(productId)
                 .chunkIndex(chunkIndex)
+                .minPrice(minPrice)
+                .maxPrice(maxPrice)
                 .score(point.getScore())
                 .text(text)
                 .name(name)
@@ -393,5 +393,14 @@ public class DenseRetrievalService {
     }
 
 
+    /**
+     * Extract Double value from Qdrant payload
+     */
+    private Double extractDouble(Map<String, io.qdrant.client.grpc.JsonWithInt.Value> payload, String key) {
+        if (payload.containsKey(key)) {
+            return payload.get(key).getDoubleValue();
+        }
+        return null;
+    }
 }
 

@@ -5,6 +5,6 @@ import java.util.List;
 public record RagChatResponse(
         String conversationId,
         String answer,
-        List<RagProductResponse> products
+        List<Long> products
 ) {
 }

@@ -2,6 +2,7 @@ package com.example.demo.rag.tools;
 
 import com.example.demo.rag.tools.implementations.GetProductByIdTool;
 import com.example.demo.rag.tools.implementations.GetProductsTool;
+import com.example.demo.rag.tools.implementations.GetProductsByPriceRangeTool;
 import com.example.demo.rag.tools.implementations.GetTopPurchasersTool;
 import com.example.demo.rag.tools.implementations.GetTopProductsByPurchaseCountTool;
 import com.example.demo.rag.tools.implementations.GetMostPurchasedProductsTool;
@@ -16,6 +17,7 @@ public class ToolConfiguration {
     private final ToolRegistry toolRegistry;
     private final GetProductByIdTool getProductByIdTool;
     private final GetProductsTool getProductsTool;
+    private final GetProductsByPriceRangeTool getProductsByPriceRangeTool;
     private final GetTopPurchasersTool getTopPurchasersTool;
     private final GetTopProductsByPurchaseCountTool getTopProductsByPurchaseCountTool;
     private final GetMostPurchasedProductsTool getMostPurchasedProductsTool;
@@ -24,7 +26,7 @@ public class ToolConfiguration {
     public void registerTools() {
         toolRegistry.registerTool(getProductByIdTool, getProductByIdTool);
         toolRegistry.registerTool(getProductsTool, getProductsTool);
-        toolRegistry.registerTool(getProductsTool, getProductsTool);
+        toolRegistry.registerTool(getProductsByPriceRangeTool, getProductsByPriceRangeTool);
         toolRegistry.registerTool(getTopPurchasersTool, getTopPurchasersTool);
         toolRegistry.registerTool(getTopProductsByPurchaseCountTool, getTopProductsByPurchaseCountTool);
         toolRegistry.registerTool(getMostPurchasedProductsTool, getMostPurchasedProductsTool);

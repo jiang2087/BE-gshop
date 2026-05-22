@@ -8,6 +8,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Locale;
 
 @Component
@@ -35,5 +37,24 @@ public class ProductVariantTools {
         Sort.Direction direction = "asc".equals(normalizedSortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
 
         return productVariantService.getAllProducts(PageRequest.of(safePage, safeSize, Sort.by(direction, field)));
+    }
+
+    public Page<ProductDetailDto> getProductsByPriceRange(List<String> types, BigDecimal minPrice, BigDecimal maxPrice, Integer page, Integer size) {
+        int safePage = page == null || page < 0 ? 0 : page;
+        int safeSize = size == null || size <= 0 ? 10 : Math.min(size, 100);
+
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize);
+        
+        var productPage = productVariantService.getProductsByPriceRange(types, minPrice, maxPrice, pageRequest);
+        
+        List<ProductDetailDto> dtos = productPage.getContent().stream()
+                .map(product -> productVariantService.getProductById(product.getId()))
+                .toList();
+        
+        return new org.springframework.data.domain.PageImpl<>(
+                dtos,
+                pageRequest,
+                productPage.getTotalElements()
+        );
     }
 }

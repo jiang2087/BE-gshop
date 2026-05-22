@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -19,14 +20,14 @@ public class SemanticBuilderService {
 
     private final List<ProductSemanticBuilder> builders;
 
-
     public String buildSemanticText(ProductDetailDto product) {
         if (product == null) {
             log.warn("Null product provided to buildSemanticText");
             return "";
         }
 
-        String productType = product.productType();
+        String productType = normalizeType(product.productType());
+        
         if (productType == null || productType.trim().isEmpty()) {
             log.warn("Product {} has no product type", product.id());
             return buildDefaultSemanticText(product);
@@ -37,15 +38,16 @@ public class SemanticBuilderService {
                 .findFirst();
 
         if (builder.isPresent()) {
-            log.debug("Building semantic text for product {} with type {}", 
-                    product.id(), productType);
+            log.info("Using {} for product {} (type: {})", 
+                    builder.get().getClass().getSimpleName(), product.id(), productType);
             return builder.get().build(product);
         } else {
-            log.warn("No builder found for product type: {}, using default builder", productType);
+            log.warn("No builder for type '{}' (original: '{}'), using default. Available: {}", 
+                    productType, product.productType(),
+                    builders.stream().map(b -> b.getClass().getSimpleName()).toList());
             return buildDefaultSemanticText(product);
         }
     }
-
 
     public List<String> buildSemanticTextBatch(List<ProductDetailDto> products) {
         if (products == null || products.isEmpty()) {
@@ -58,21 +60,19 @@ public class SemanticBuilderService {
                 .toList();
     }
 
-
     public boolean hasBuilderFor(String productType) {
-        if (productType == null || productType.trim().isEmpty()) {
+        String normalized = normalizeType(productType);
+        if (normalized == null || normalized.trim().isEmpty()) {
             return false;
         }
 
         return builders.stream()
-                .anyMatch(b -> b.supports(productType));
+                .anyMatch(b -> b.supports(normalized));
     }
-
 
     public List<String> getSupportedProductTypes() {
         return List.of("LAPTOP", "MOBILE", "WATCHES", "TELEVISION");
     }
-
 
     private String buildDefaultSemanticText(ProductDetailDto product) {
         StringBuilder sb = new StringBuilder();
@@ -93,5 +93,20 @@ public class SemanticBuilderService {
         }
 
         return sb.toString();
+    }
+
+    private String normalizeType(String productType) {
+        if (productType == null) {
+            return null;
+        }
+
+        String normalized = productType.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "WATCH", "WATCHES" -> "WATCHES";
+            case "LAPTOP", "LAPTOPS" -> "LAPTOP";
+            case "MOBILE", "MOBILES", "PHONE", "PHONES", "SMARTPHONE", "SMARTPHONES" -> "MOBILE";
+            case "TELEVISION", "TELEVISIONS", "TV", "TVS" -> "TELEVISION";
+            default -> normalized;
+        };
     }
 }

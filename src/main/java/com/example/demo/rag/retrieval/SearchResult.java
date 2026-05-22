@@ -57,6 +57,16 @@ public class SearchResult {
     private String type;
     
     /**
+     * Minimum price across all product variants
+     */
+    private Double minPrice;
+    
+    /**
+     * Maximum price across all product variants
+     */
+    private Double maxPrice;
+    
+    /**
      * Additional metadata
      */
     private Map<String, Object> metadata;
