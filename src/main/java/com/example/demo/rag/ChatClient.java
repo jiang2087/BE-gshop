@@ -145,11 +145,11 @@ public class ChatClient {
                 matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matchStr));
             } else if (nums.size() == 1) {
                 String vndStr = formatVndAmount(nums.get(0) * rate);
-                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matchStr + " " + vndStr + " VND)"));
+                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matchStr + "(~ " + vndStr + " VND)"));
             } else {
                 String vndStr1 = formatVndAmount(nums.get(0) * rate);
                 String vndStr2 = formatVndAmount(nums.get(1) * rate);
-                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matchStr + " " + vndStr1 + " - " + vndStr2 + " VND)"));
+                matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(matchStr + "(~ " + vndStr1 + " - " + vndStr2 + " VND)"));
             }
         }
         matcher.appendTail(sb);

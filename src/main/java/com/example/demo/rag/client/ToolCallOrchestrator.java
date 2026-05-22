@@ -18,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,7 +49,76 @@ public class ToolCallOrchestrator {
             return executeDirectFlow(model, messages, selection);
         }
 
+        if (!shouldAllowLlmToolCalling(userQuery)) {
+            logger.info("Skip tool calling for generic query: {}", userQuery);
+            return chatApiClient.sendRequest(model, messages, null, null, false);
+        }
+
         return executeLlmFlow(model, messages, tools, forcedToolName, userQuery);
+    }
+
+    private boolean shouldAllowLlmToolCalling(String userQuery) {
+        if (userQuery == null || userQuery.isBlank()) {
+            return false;
+        }
+        String normalized = userQuery.toLowerCase(Locale.ROOT);
+
+        // Only enable LLM tool-calls for explicit operational intents.
+        return containsAny(normalized,
+                // product identity
+                "product id", "product_id", " id ", "sku", "barcode",
+
+                // listing / searching
+                "list", "browse", "search", "find", "lookup",
+                "filter", "sort", "query",
+
+                // pricing
+                "price", "prices", "cost", "gia", "giá",
+                "cheap", "expensive",
+                "under", "below", "over", "above",
+                "between", "from", "to", "den", "đến",
+
+                // sales ranking
+                "best-selling", "best selling", "top",
+                "most sold", "best seller",
+                "hot", "trending", "popular",
+                "bán chạy", "nổi bật",
+
+                // revenue / orders
+                "purchase", "purchased",
+                "order", "orders",
+                "revenue", "sales", "income",
+                "doanh thu", "đơn hàng",
+
+                // customer analytics
+                "top customer", "top purchaser",
+                "highest spending", "best buyer",
+                "khách hàng tốt nhất",
+                "khách mua nhiều",
+
+
+                // date / recency
+                "newest", "latest", "created",
+                "recent", "recently added",
+                "mới nhất", "gần đây",
+
+                // ecommerce metrics
+                "gmv", "aov", "conversion",
+                "refund", "returned",
+
+                // category / brand
+                "category", "brand",
+                "loại", "danh mục", "thương hiệu"
+        );
+    }
+
+    private boolean containsAny(String input, String... keys) {
+        for (String key : keys) {
+            if (input.contains(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ChatCompletionResponse executeDirectFlow(

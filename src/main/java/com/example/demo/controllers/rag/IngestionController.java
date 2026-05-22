@@ -59,4 +59,15 @@ public class IngestionController {
         ingestionService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/collection")
+    public ResponseEntity<Void> clearCollection(@RequestParam(required = false) String name) {
+        if (name == null || name.isBlank()) {
+            ingestionService.clearCollection();
+        } else {
+            ingestionService.clearCollection(name);
+        }
+        return ResponseEntity.noContent().build();
+    }
 }

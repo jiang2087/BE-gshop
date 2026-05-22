@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Service to dynamically build semantic text for products
+ * Service to dynamically build natural-language text for products
  * based on their product type
  */
 @Slf4j

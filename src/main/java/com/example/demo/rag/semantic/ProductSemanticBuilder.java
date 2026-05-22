@@ -5,9 +5,9 @@ import com.example.demo.dto.product.ProductDetailDto;
 public interface ProductSemanticBuilder {
 
     /**
-     * Build semantic text representation from ProductDetailDto
+     * Build natural-language text representation from ProductDetailDto
      * @param product Product detail DTO
-     * @return Semantic text for embedding
+     * @return Natural-language text for embedding
      */
     String build(ProductDetailDto product);
     

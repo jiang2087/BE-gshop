@@ -18,7 +18,7 @@ public class LaptopSemanticBuilder extends AbstractSemanticBuilder {
 
     @Override
     public String build(ProductDetailDto product) {
-        log.debug("Building semantic text for laptop: {}", product.name());
+        log.debug("Building natural-language text for laptop: {}", product.name());
         StringBuilder sb = new StringBuilder();
 
         sb.append(product.name()).append(" laptop by ").append(product.brand()).append(".\n");
@@ -47,7 +47,7 @@ public class LaptopSemanticBuilder extends AbstractSemanticBuilder {
         appendCategorySection(sb, categories);
 
         String result = sb.toString().trim();
-        log.debug("Generated semantic text length: {} chars", result.length());
+        log.debug("Generated natural-language text length: {} chars", result.length());
         return result;
     }
 

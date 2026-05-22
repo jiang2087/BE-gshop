@@ -28,7 +28,7 @@ import static io.qdrant.client.VectorsFactory.vectors;
 
 /**
  * Service for ingesting products into the vector database
- * Integrates semantic building, chunking, and embedding
+ * Integrates natural-language building, chunking, and embedding
  */
 @Slf4j
 @Service
@@ -53,17 +53,17 @@ public class IngestionService {
         log.info("Starting ingestion for product: {} (ID: {})", product.name(), product.id());
 
         try {
-            // Ensure stale chunks are removed before creating new semantic chunks.
+            // Ensure stale chunks are removed before creating new natural-language chunks.
             if (product.id() != null) {
                 qdrantClient.deleteAsync(collectionName, buildProductFilter(product.id())).get();
                 log.info("Deleted existing vector points for product {}", product.id());
             }
 
-            // Step 1: Build semantic text
+            // Step 1: Build natural-language text
             String semanticText = buildSemanticTextForIngestion(product);
-            log.debug("Generated semantic text of length: {}", semanticText.length());
+            log.debug("Generated natural-language text of length: {}", semanticText.length());
 
-            // Step 2: Chunk the semantic text
+            // Step 2: Chunk natural-language text
             List<Chunk> chunks = chunkingService.chunkTextWithMetadata(semanticText);
             log.info("Created {} chunks for product {}", chunks.size(), product.id());
 
@@ -204,6 +204,40 @@ public class IngestionService {
     }
 
     /**
+     * Delete all points from configured collection
+     */
+    public void clearCollection() {
+        clearCollection(collectionName);
+    }
+
+    /**
+     * Delete all points from target collection
+     * @param targetCollection Collection name
+     */
+    public void clearCollection(String targetCollection) {
+        if (targetCollection == null || targetCollection.isBlank()) {
+            log.warn("Blank collection name provided for clear operation");
+            return;
+        }
+
+        try {
+            log.info("Clearing all vector points from collection {}", targetCollection);
+            qdrantClient.deleteAsync(targetCollection, buildMatchAllFilter()).get();
+            log.info("Cleared all vector points from collection {}", targetCollection);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Clear collection interrupted for {}", targetCollection, e);
+            throw new IngestionException("Clear collection interrupted", e);
+        } catch (ExecutionException e) {
+            log.error("Failed to clear collection {}", targetCollection, e);
+            throw new IngestionException("Failed to clear collection", e);
+        } catch (Exception e) {
+            log.error("Unexpected error while clearing collection {}", targetCollection, e);
+            throw new IngestionException("Unexpected clear collection error", e);
+        }
+    }
+
+    /**
      * Get ingestion statistics
      * @param product Product to analyze
      * @return Ingestion statistics
@@ -298,11 +332,11 @@ public class IngestionService {
         }
 
         if (!fallback.isEmpty()) {
-            log.warn("Semantic text empty for product {}, using ingestion fallback text", product.id());
+            log.warn("Natural-language text empty for product {}, using ingestion fallback text", product.id());
             return fallback.toString();
         }
 
-        throw new IngestionException("Cannot build semantic text for product " + product.id());
+        throw new IngestionException("Cannot build natural-language text for product " + product.id());
     }
 
     /**
@@ -352,7 +386,7 @@ public class IngestionService {
     }
 
     /**
-     * Extract basic description from semantic text
+     * Extract basic description from natural-language text
      * Returns only the product description part, excluding use cases and categories
      */
     private String extractBasicDescription(String semanticText) {
@@ -392,6 +426,10 @@ public class IngestionService {
                                 .build())
                         .build())
                 .build();
+    }
+
+    private Common.Filter buildMatchAllFilter() {
+        return Common.Filter.newBuilder().build();
     }
 
     /**

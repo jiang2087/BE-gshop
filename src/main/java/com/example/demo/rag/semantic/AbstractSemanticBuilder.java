@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Abstract base class for semantic builders providing common utility methods
+ * Abstract base class for natural-language builders providing common utility methods
  */
 public abstract class AbstractSemanticBuilder implements ProductSemanticBuilder {
 
@@ -91,10 +91,9 @@ public abstract class AbstractSemanticBuilder implements ProductSemanticBuilder 
      */
     protected void appendUseCasesSection(StringBuilder sb, Set<String> useCases) {
         if (useCases != null && !useCases.isEmpty()) {
-            sb.append("\nBest for:\n");
-            for (String useCase : useCases) {
-                sb.append("- ").append(useCase).append("\n");
-            }
+            sb.append("\nBest for ")
+                    .append(joinAsNaturalList(useCases))
+                    .append(".\n");
         }
     }
 
@@ -103,11 +102,36 @@ public abstract class AbstractSemanticBuilder implements ProductSemanticBuilder 
      */
     protected void appendCategorySection(StringBuilder sb, Set<String> categories) {
         if (categories != null && !categories.isEmpty()) {
-            sb.append("\nCategory:\n");
-            for (String category : categories) {
-                sb.append(category).append("\n");
-            }
+            sb.append("\nThis product belongs to categories such as ")
+                    .append(joinAsNaturalList(categories))
+                    .append(".\n");
         }
+    }
+
+    /**
+     * Join set items as natural language list: "A", "A and B", "A, B, and C"
+     */
+    protected String joinAsNaturalList(Set<String> items) {
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+
+        String[] values = items.toArray(new String[0]);
+        if (values.length == 1) {
+            return values[0];
+        }
+        if (values.length == 2) {
+            return values[0] + " and " + values[1];
+        }
+
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                result.append(i == values.length - 1 ? ", and " : ", ");
+            }
+            result.append(values[i]);
+        }
+        return result.toString();
     }
 
     /**

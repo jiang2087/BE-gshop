@@ -44,7 +44,7 @@ class SemanticBuilderServiceTest {
     }
 
     @Test
-    void testLaptopSemanticBuilder() {
+    void testLaptopNaturalLanguageBuilder() {
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("cpu", "Intel Core i7-12700H");
         attributes.put("ram", "16GB");
@@ -251,7 +251,7 @@ class SemanticBuilderServiceTest {
     }
 
     @Test
-    void testMobileSemanticBuilder() {
+    void testMobileNaturalLanguageBuilder() {
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("processor", "Snapdragon 8 Gen 2");
         attributes.put("ram", "12GB");
@@ -412,9 +412,9 @@ class SemanticBuilderServiceTest {
 
         assertNotNull(result);
         assertTrue(result.contains("Unknown Product"), "Should include product name");
-        assertTrue(result.contains("Unknown Brand"), "Should include brand in default semantic text");
-        assertTrue(result.contains("Some description"), "Should include description in default semantic text");
-        assertTrue(result.contains("color: Red"), "Should include product attributes in default semantic text");
+        assertTrue(result.contains("Unknown Brand"), "Should include brand in default natural language text");
+        assertTrue(result.contains("Some description"), "Should include description in default natural language text");
+        assertTrue(result.contains("color: Red"), "Should include product attributes in default natural language text");
         assertFalse(result.contains("Best for:"), "Default builder should not generate use cases section");
         assertFalse(result.contains("Category:"), "Default builder should not generate category section");
     }
@@ -684,3 +684,4 @@ class SemanticBuilderServiceTest {
         assertEquals("", semanticBuilderService.buildSemanticText(null));
     }
 }
+
