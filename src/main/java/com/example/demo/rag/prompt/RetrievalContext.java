@@ -40,18 +40,30 @@ public class RetrievalContext {
         return results.stream()
                 .filter(Objects::nonNull)
                 .map(result -> {
-                    String priceInfo = formatPriceInfo(result.getMinPrice(), result.getMaxPrice());
-                    return String.format(
-                            "- productId=%s | documentId=%s | name=%s | brand=%s | type=%s%s | score=%.4f%n  %s",
-                            result.getProductId(),
-                            result.getDocumentId(),
-                            safe(result.getName()),
-                            safe(result.getBrand()),
-                            safe(result.getType()),
-                            priceInfo,
-                            result.getScore() == null ? 0f : result.getScore(),
-                            safe(result.getText())
-                    );
+                    if (result.getProductId() != null) {
+                        String priceInfo = formatPriceInfo(result.getMinPrice(), result.getMaxPrice());
+                        return String.format(
+                                "- [PRODUCT] productId=%s | documentId=%s | name=%s | brand=%s | type=%s%s | score=%.4f%n  %s",
+                                result.getProductId(),
+                                result.getDocumentId(),
+                                safe(result.getName()),
+                                safe(result.getBrand()),
+                                safe(result.getType()),
+                                priceInfo,
+                                result.getScore() == null ? 0f : result.getScore(),
+                                safe(result.getText())
+                        );
+                    } else {
+                        return String.format(
+                                "- [DOCUMENT] name=%s | brand=%s | type=%s | chunkIndex=%s | score=%.4f%n  %s",
+                                safe(result.getName()),
+                                safe(result.getBrand()),
+                                safe(result.getType()),
+                                result.getChunkIndex() != null ? result.getChunkIndex() : "0",
+                                result.getScore() == null ? 0f : result.getScore(),
+                                safe(result.getText())
+                        );
+                    }
                 })
                 .collect(Collectors.joining("\n"));
     }

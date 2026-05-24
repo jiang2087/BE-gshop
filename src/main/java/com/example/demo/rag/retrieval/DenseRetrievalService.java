@@ -32,6 +32,9 @@ public class DenseRetrievalService {
     @Value("${qdrant.collection-name:product_variants}")
     private String collectionName;
 
+    @Value("${qdrant.document-collection-name:knowledge_base}")
+    private String docCollectionName;
+
     @Value("${retrieval.default-limit:10}")
     private int defaultLimit;
 
@@ -84,9 +87,20 @@ public class DenseRetrievalService {
                 throw new IllegalArgumentException("Score threshold must be in range [0, 1]");
             }
 
-            // Step 3: Execute search
-            List<ScoredPoint> scoredPoints = executeSearch(queryEmbedding, limit, scoreThreshold);
-            log.info("Found {} results for query", scoredPoints.size());
+            // Step 3: Execute search in both product and document collections
+            List<ScoredPoint> productPoints = executeSearch(collectionName, queryEmbedding, limit, scoreThreshold);
+            List<ScoredPoint> scoredPoints = new ArrayList<>(productPoints);
+
+            try {
+                if (qdrantClient.collectionExistsAsync(docCollectionName).get()) {
+                    List<ScoredPoint> docPoints = executeSearch(docCollectionName, queryEmbedding, limit, scoreThreshold);
+                    scoredPoints.addAll(docPoints);
+                }
+            } catch (Exception ex) {
+                log.warn("Document collection {} not available or search failed: {}", docCollectionName, ex.getMessage());
+            }
+
+            log.info("Found {} total results across collections for query", scoredPoints.size());
 
             // Step 4: Convert to search results
             List<SearchResult> results = scoredPoints.stream()
@@ -150,13 +164,14 @@ public class DenseRetrievalService {
      * Execute search against Qdrant
      */
     private List<ScoredPoint> executeSearch(
+            String targetCollection,
             List<Float> queryEmbedding,
             int limit,
             float scoreThreshold
     ) throws ExecutionException, InterruptedException {
         
         SearchPoints.Builder searchBuilder = SearchPoints.newBuilder()
-                .setCollectionName(collectionName)
+                .setCollectionName(targetCollection)
                 .addAllVector(queryEmbedding)
                 .setLimit(limit)
                 .setWithPayload(io.qdrant.client.WithPayloadSelectorFactory.enable(true));

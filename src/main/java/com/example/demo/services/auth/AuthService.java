@@ -82,7 +82,6 @@ public class AuthService {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
         if (cartKey != null && !cartKey.isBlank()) {
-            log.info("Checking cart key and user Id: {}, {}", cartKey,  userDetails.getId());
             cartService.mergeCart(cartKey, userDetails.getId());
         }
         return new JwtResponse(

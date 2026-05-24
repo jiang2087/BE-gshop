@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "chunking")
 public class ChunkingConfig {
 
-    private int chunkSize = 512;
+    private int chunkSize = 1000;
 
-    private int overlap = 50;
+    private int overlap = 0;
 
     private int minChunkSize = 128;
 

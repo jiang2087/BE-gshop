@@ -51,6 +51,7 @@ public class SentenceAwareChunker implements TextChunker {
         }
 
         List<SentenceSpan> sentences = splitIntoSentenceSpans(text);
+        sentences = enforceMaxSentenceLength(sentences);
 
         List<Chunk> chunks = new ArrayList<>();
 
@@ -63,8 +64,9 @@ public class SentenceAwareChunker implements TextChunker {
         for (SentenceSpan sentence : sentences) {
 
             int sentenceSize = sentence.text().length();
+            int separatorSize = buffer.isEmpty() ? 0 : 1;
 
-            boolean wouldExceedMax = currentSize + sentenceSize > chunkSize;
+            boolean wouldExceedMax = currentSize + separatorSize + sentenceSize > chunkSize;
             boolean belowMin = currentSize < config.getMinChunkSize();
 
             if (wouldExceedMax && !buffer.isEmpty() && !belowMin) {
@@ -79,7 +81,7 @@ public class SentenceAwareChunker implements TextChunker {
             }
 
             buffer.add(sentence);
-            currentSize += sentenceSize;
+            currentSize += separatorSize + sentenceSize;
         }
 
         if (!buffer.isEmpty()) {
@@ -155,6 +157,30 @@ public class SentenceAwareChunker implements TextChunker {
         int from = Math.max(0, buffer.size() - overlap);
 
         return new ArrayList<>(buffer.subList(from, buffer.size()));
+    }
+
+    private List<SentenceSpan> enforceMaxSentenceLength(List<SentenceSpan> sentences) {
+        if (sentences.isEmpty()) {
+            return sentences;
+        }
+
+        List<SentenceSpan> normalized = new ArrayList<>();
+        for (SentenceSpan sentence : sentences) {
+            String text = sentence.text();
+            if (text.length() <= chunkSize) {
+                normalized.add(sentence);
+                continue;
+            }
+
+            int cursor = 0;
+            while (cursor < text.length()) {
+                int end = Math.min(cursor + chunkSize, text.length());
+                String part = text.substring(cursor, end);
+                normalized.add(new SentenceSpan(part, sentence.start() + cursor, sentence.start() + end));
+                cursor = end;
+            }
+        }
+        return normalized;
     }
     
     private int estimateTokens(String text) {
