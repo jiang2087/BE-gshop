@@ -1,7 +1,8 @@
- package com.example.demo.rag.client;
+package com.example.demo.rag.client;
 
 import com.example.demo.dto.message_ai.ChatCompletionResponse;
 import com.example.demo.dto.message_ai.Choice;
+import com.example.demo.dto.message_ai.Message;
 import com.example.demo.dto.response.RagChatResponse;
 import com.example.demo.rag.memory.ChatTurn;
 import com.example.demo.rag.prompt.PromptBuilder;
@@ -28,6 +29,8 @@ public class RagOrchestrator {
     private final ProductQueryDetector productQueryDetector;
     private final ChatClientConfig config;
 
+    private record AssistantReply(String content) {}
+
     public RagChatResponse executeRagFlow(String userQuery, int retrievalLimit) {
         return executeRagFlow(userQuery, retrievalLimit, List.of());
     }
@@ -37,10 +40,10 @@ public class RagOrchestrator {
 
         List<SearchResult> retrieved = retrieveContext(userQuery, retrievalLimit);
         String systemPrompt = buildSystemPrompt(userQuery, retrieved);
-        String answer = generateAnswer(systemPrompt, userQuery, conversationHistory);
+        AssistantReply reply = generateAnswer(systemPrompt, userQuery, conversationHistory);
         List<Long> products = extractProducts(userQuery, retrieved);
 
-        return new RagChatResponse(null, answer, products);
+        return new RagChatResponse(null, reply.content(), products, null);
     }
 
     private void validateInput(String userQuery) {
@@ -69,7 +72,7 @@ public class RagOrchestrator {
         return PromptBuilder.buildSystemPrompt(retrievalContext);
     }
 
-    private String generateAnswer(String systemPrompt, String userQuery, List<ChatTurn> conversationHistory) {
+    private AssistantReply generateAnswer(String systemPrompt, String userQuery, List<ChatTurn> conversationHistory) {
         List<Map<String, Object>> ragMessages = new java.util.ArrayList<>();
         
         // Add system prompt
@@ -78,10 +81,10 @@ public class RagOrchestrator {
         // Add conversation history if exists
         if (conversationHistory != null && !conversationHistory.isEmpty()) {
             for (ChatTurn turn : conversationHistory) {
-                ragMessages.add(Map.of(
-                    "role", turn.role(),
-                    "content", turn.content()
-                ));
+                Map<String, Object> msg = new java.util.HashMap<>();
+                msg.put("role", turn.role());
+                msg.put("content", turn.content());
+                ragMessages.add(msg);
             }
         }
         
@@ -100,7 +103,7 @@ public class RagOrchestrator {
                     config.getDefaultModel(), ragMessages, null, null, false
             );
         }
-        return extractFirstAssistantMessage(completionResponse);
+        return extractFirstChoiceMessage(completionResponse);
     }
 
     private List<Long> extractProducts(String userQuery, List<SearchResult> retrieved) {
@@ -119,14 +122,15 @@ public class RagOrchestrator {
                 .toList();
     }
 
-    private String extractFirstAssistantMessage(ChatCompletionResponse response) {
+    private AssistantReply extractFirstChoiceMessage(ChatCompletionResponse response) {
         if (response == null || response.getChoices() == null || response.getChoices().isEmpty()) {
-            return "";
+            return new AssistantReply("");
         }
         Choice firstChoice = response.getChoices().getFirst();
-        if (firstChoice == null || firstChoice.getMessage() == null || firstChoice.getMessage().getContent() == null) {
-            return "";
+        if (firstChoice == null || firstChoice.getMessage() == null) {
+            return new AssistantReply("");
         }
-        return firstChoice.getMessage().getContent();
+        Message msg = firstChoice.getMessage();
+        return new AssistantReply(msg.getContent() != null ? msg.getContent() : "");
     }
 }

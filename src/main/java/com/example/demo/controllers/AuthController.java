@@ -1,6 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.Enums.UserRole;
+import com.example.demo.Enums.UserStatus;
 import com.example.demo.config.UserDetailsImpl;
 import com.example.demo.models.Role;
 import com.example.demo.models.User;
@@ -78,10 +79,8 @@ public class AuthController {
                 .build();
         Role userRole = roleRepository.findByName(UserRole.ROLE_USER)
                 .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-        if(Objects.isNull(userRole)){
-           userRole = new Role(UserRole.ROLE_USER);
-        }
         user.setRole(Set.of(userRole));
+        user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
         return ResponseEntity.ok(new MessageResponse("User register successfully!"));
     }

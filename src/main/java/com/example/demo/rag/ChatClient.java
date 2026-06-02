@@ -25,8 +25,6 @@ public class ChatClient {
     private final ChatMemoryService chatMemoryService;
     private final QueryAnalyzer queryAnalyzer;
 
-
-
     public RagChatResponse callChatWithRag(String userQuery, int retrievalLimit) {
         int dynamicLimit = queryAnalyzer.extractProductLimit(userQuery, retrievalLimit);
         return ragOrchestrator.executeRagFlow(userQuery, dynamicLimit);
@@ -68,7 +66,7 @@ public class ChatClient {
         }
 
         chatMemoryService.appendUserMessage(effectiveConversationId, userQuery);
-        chatMemoryService.appendAssistantMessage(effectiveConversationId, assistantAnswer);
+        chatMemoryService.appendAssistantMessage(effectiveConversationId, assistantAnswer, null);
 
         // Filter products based on LLM's selection or fallback to RAG retrieved products
         List<Long> mergedProducts = new ArrayList<Long>();
@@ -78,7 +76,7 @@ public class ChatClient {
             mergedProducts.addAll(response.products());
         }
 
-        return new RagChatResponse(effectiveConversationId, assistantAnswer, mergedProducts);
+        return new RagChatResponse(effectiveConversationId, assistantAnswer, mergedProducts, null);
     }
 
     public void clearConversation(String conversationId) {
@@ -186,5 +184,3 @@ public class ChatClient {
         }
     }
 }
-
-

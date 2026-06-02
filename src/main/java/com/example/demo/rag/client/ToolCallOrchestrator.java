@@ -162,10 +162,10 @@ public class ToolCallOrchestrator {
             return first;
         }
 
-        conversation.add(Map.of(
-                "role", "assistant",
-                "tool_calls", toolCalls
-        ));
+        Map<String, Object> assistantMsg = new HashMap<>();
+        assistantMsg.put("role", "assistant");
+        assistantMsg.put("tool_calls", toolCalls);
+        conversation.add(assistantMsg);
 
         for (ToolCall toolCall : toolCalls) {
             validateToolCall(toolCall);
@@ -207,7 +207,6 @@ public class ToolCallOrchestrator {
         }
         return firstChoice.getMessage().getToolCalls();
     }
-
     private void validateToolCall(ToolCall toolCall) {
         if (toolCall == null || toolCall.getFunction() == null ||
                 toolCall.getFunction().getName() == null ||

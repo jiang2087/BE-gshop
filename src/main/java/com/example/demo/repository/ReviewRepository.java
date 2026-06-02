@@ -22,7 +22,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                 r.comment,
                 r.createdAt,
                 r.rating,
-                r.avatar,
+                r.user.imageUrl,
                 r.order.id,
                 r.user.id,
                 pv.product.id,
@@ -43,7 +43,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                     r.comment,
                     r.createdAt,
                     r.rating,
-                    r.avatar,
+                    r.user.imageUrl,
                     r.order.id,
                     r.user.id,
                     pv.product.id,
@@ -71,17 +71,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
                 WHERE r.id = :reviewId
             """)
     void decreaseHelpfulCount(Long reviewId);
-
     @Query("""
-            SELECT new com.example.demo.dto.response.ReviewStats(
-                   pv.product.id,
-                   COUNT(r.id),
-                   COALESCE(AVG(r.rating), 0)
-               )
-               FROM Review r
-               JOIN r.productVariant pv
-               WHERE pv.product.id IN :ids
-               GROUP BY pv.product.id
-            """)
+    SELECT new com.example.demo.dto.response.ReviewStats(
+           pv.product.id,
+           COUNT(r.id),
+           COALESCE(AVG(r.rating * 1.0), 0.0)
+       )
+       FROM Review r
+       JOIN r.productVariant pv
+       WHERE pv.product.id IN :ids
+       GROUP BY pv.product.id
+""")
     List<ReviewStats> getReviewStats(@Param("ids") List<Long> ids);
 }

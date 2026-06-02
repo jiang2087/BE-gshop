@@ -29,7 +29,12 @@ public class RedisChatMemoryService implements ChatMemoryService {
 
     @Override
     public void appendAssistantMessage(String conversationId, String content) {
-        append(conversationId, "assistant", content);
+        appendAssistantMessage(conversationId, content, null);
+    }
+
+    @Override
+    public void appendAssistantMessage(String conversationId, String content, String reasoningContent) {
+        append(conversationId, "assistant", content, reasoningContent);
     }
 
     @Override
@@ -47,12 +52,16 @@ public class RedisChatMemoryService implements ChatMemoryService {
     }
 
     private void append(String conversationId, String role, String content) {
+        append(conversationId, role, content, null);
+    }
+
+    private void append(String conversationId, String role, String content, String reasoningContent) {
         String key = buildKey(conversationId);
         List<ChatTurn> turns = readTurns(key);
         if (turns == null) {
             turns = new ArrayList<>();
         }
-        turns.add(new ChatTurn(role, content, Instant.now()));
+        turns.add(new ChatTurn(role, content, reasoningContent, Instant.now()));
 
         int maxTurns = Math.max(1, config.getMaxTurns());
         if (turns.size() > maxTurns) {
@@ -91,12 +100,17 @@ public class RedisChatMemoryService implements ChatMemoryService {
     private ChatTurn mapToChatTurn(Map<String, Object> map) {
         String role = toStringValue(map.get("role"));
         String content = toStringValue(map.get("content"));
+        String reasoningContent = toStringValueOrNull(map.get("reasoningContent"));
         Instant timestamp = toInstant(map.get("timestamp"));
-        return new ChatTurn(role, content, timestamp);
+        return new ChatTurn(role, content, reasoningContent, timestamp);
     }
 
     private String toStringValue(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    private String toStringValueOrNull(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private Instant toInstant(Object value) {

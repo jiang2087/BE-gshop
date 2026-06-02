@@ -89,7 +89,6 @@ public class ProductController {
         return ResponseEntity.ok(result);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/search")
     public ResponseEntity<Page<Product>> search(
             @RequestParam(required = false)
