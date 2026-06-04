@@ -57,6 +57,15 @@ public class ToolCallOrchestrator {
         return executeLlmFlow(model, messages, tools, forcedToolName, userQuery);
     }
 
+    public boolean shouldAttemptToolFlow(String userQuery, List<Map<String, Object>> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return false;
+        }
+        ToolSelection selection = toolSelector.selectTool(userQuery, tools);
+        return selection != null && selection.isShouldUseDirectExecution()
+                || shouldAllowLlmToolCalling(userQuery);
+    }
+
     private boolean shouldAllowLlmToolCalling(String userQuery) {
         if (userQuery == null || userQuery.isBlank()) {
             return false;

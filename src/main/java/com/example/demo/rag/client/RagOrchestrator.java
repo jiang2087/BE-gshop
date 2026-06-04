@@ -4,6 +4,7 @@ import com.example.demo.dto.message_ai.ChatCompletionResponse;
 import com.example.demo.dto.message_ai.Choice;
 import com.example.demo.dto.message_ai.Message;
 import com.example.demo.dto.response.RagChatResponse;
+import com.example.demo.rag.memory.ChatMemoryConfig;
 import com.example.demo.rag.memory.ChatTurn;
 import com.example.demo.rag.prompt.PromptBuilder;
 import com.example.demo.rag.prompt.RetrievalContext;
@@ -28,6 +29,9 @@ public class RagOrchestrator {
     private final ToolExecutor toolExecutor;
     private final ProductQueryDetector productQueryDetector;
     private final ChatClientConfig config;
+    private final ChatMemoryConfig memoryConfig;
+
+    private volatile List<Map<String, Object>> cachedToolSpecs;
 
     private record AssistantReply(String content) {}
 
@@ -79,8 +83,9 @@ public class RagOrchestrator {
         ragMessages.add(Map.of("role", "system", "content", systemPrompt));
         
         // Add conversation history if exists
-        if (conversationHistory != null && !conversationHistory.isEmpty()) {
-            for (ChatTurn turn : conversationHistory) {
+        List<ChatTurn> promptHistory = trimHistoryForPrompt(conversationHistory);
+        if (!promptHistory.isEmpty()) {
+            for (ChatTurn turn : promptHistory) {
                 Map<String, Object> msg = new java.util.HashMap<>();
                 msg.put("role", turn.role());
                 msg.put("content", turn.content());
@@ -92,9 +97,9 @@ public class RagOrchestrator {
         ragMessages.add(Map.of("role", "user", "content", userQuery));
 
         // Use ToolCallOrchestrator to enable tool calling
-        List<Map<String, Object>> tools = toolExecutor.buildToolSpecs();
+        List<Map<String, Object>> tools = getToolSpecs();
         ChatCompletionResponse completionResponse;
-        if (tools != null && !tools.isEmpty()) {
+        if (!tools.isEmpty() && toolCallOrchestrator.shouldAttemptToolFlow(userQuery, tools)) {
             completionResponse = toolCallOrchestrator.executeWithTools(
                     config.getDefaultModel(), ragMessages, tools, null
             );
@@ -104,6 +109,56 @@ public class RagOrchestrator {
             );
         }
         return extractFirstChoiceMessage(completionResponse);
+    }
+
+    private List<ChatTurn> trimHistoryForPrompt(List<ChatTurn> conversationHistory) {
+        if (conversationHistory == null || conversationHistory.isEmpty()) {
+            return List.of();
+        }
+
+        int maxTurns = Math.max(1, memoryConfig.getMaxPromptTurns());
+        int maxChars = Math.max(500, memoryConfig.getMaxPromptChars());
+        List<ChatTurn> selected = new java.util.ArrayList<>();
+        int usedChars = 0;
+
+        for (int i = conversationHistory.size() - 1; i >= 0 && selected.size() < maxTurns; i--) {
+            ChatTurn turn = conversationHistory.get(i);
+            if (turn == null || turn.content() == null || turn.content().isBlank()) {
+                continue;
+            }
+            ChatTurn promptTurn = truncateTurn(turn, Math.max(1, maxChars - usedChars));
+            int contentChars = promptTurn.content().length();
+            if (!selected.isEmpty() && usedChars + contentChars > maxChars) {
+                break;
+            }
+            selected.add(promptTurn);
+            usedChars += contentChars;
+        }
+
+        java.util.Collections.reverse(selected);
+        return selected;
+    }
+
+    private ChatTurn truncateTurn(ChatTurn turn, int maxChars) {
+        if (turn.content().length() <= maxChars) {
+            return turn;
+        }
+        String content = turn.content().substring(0, Math.max(0, maxChars - 3)) + "...";
+        return new ChatTurn(turn.role(), content, null, turn.timestamp());
+    }
+
+    private List<Map<String, Object>> getToolSpecs() {
+        List<Map<String, Object>> local = cachedToolSpecs;
+        if (local != null) {
+            return local;
+        }
+        synchronized (this) {
+            if (cachedToolSpecs == null) {
+                List<Map<String, Object>> specs = toolExecutor.buildToolSpecs();
+                cachedToolSpecs = specs == null ? List.of() : List.copyOf(specs);
+            }
+            return cachedToolSpecs;
+        }
     }
 
     private List<Long> extractProducts(String userQuery, List<SearchResult> retrieved) {

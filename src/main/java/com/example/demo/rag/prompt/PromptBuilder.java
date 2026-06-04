@@ -39,6 +39,7 @@ public class PromptBuilder {
             - Do not invent information outside the context.
             - Show products as lists when multiple items exist.
             - prices in USD ($).
+            - Only answer based on the provided context.
             - If original prices are in VND, convert to USD.
             - Clearly state when information is insufficient.
             - Recommend related products when suitable.

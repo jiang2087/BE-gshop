@@ -16,6 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 public class DenseRetrievalService {
     private static final int MAX_LIMIT = 100;
     private static final long ENTITY_CACHE_TTL_MS = 5 * 60 * 1000;
+    private static final long COLLECTION_EXISTS_CACHE_TTL_MS = 5 * 60 * 1000;
     private static final Set<String> LAPTOP_KEYWORDS = Set.of("laptop", "laptops", "notebook", "ultrabook", "macbook");
     private static final Set<String> MOBILE_KEYWORDS = Set.of("mobile", "mobiles", "phone", "phones", "smartphone", "smartphones", "dien thoai", "điện thoại");
     private static final Set<String> TELEVISION_KEYWORDS = Set.of("tv", "tvs", "television", "televisions", "tivi");
@@ -38,6 +41,8 @@ public class DenseRetrievalService {
     private volatile long entityCacheLoadedAt;
     private volatile List<String> cachedBrands = List.of();
     private volatile List<String> cachedNames = List.of();
+    private volatile long docCollectionCheckedAt;
+    private volatile boolean docCollectionAvailable;
 
     @Value("${qdrant.collection-name:product_variants}")
     private String collectionName;
@@ -80,11 +85,6 @@ public class DenseRetrievalService {
                 request.getQuery(), normalizedQuery, extractedFilters);
 
         try {
-            // Step 1: Generate query embedding
-            List<Float> queryEmbedding = embeddingService.embed(normalizedQuery);
-            log.debug("Generated query embedding with dimension: {}", queryEmbedding.size());
-
-            // Step 2: Build search parameters
             int limit = request.getLimit() != null ? request.getLimit() : defaultLimit;
             if (limit <= 0) {
                 limit = defaultLimit;
@@ -98,20 +98,36 @@ public class DenseRetrievalService {
             if (scoreThreshold < 0f || scoreThreshold > 1f) {
                 throw new IllegalArgumentException("Score threshold must be in range [0, 1]");
             }
+            final int effectiveLimit = limit;
 
-            // Step 3: Execute search in both product and document collections
+            // Step 1: Generate query embedding
+            List<Float> queryEmbedding = embeddingService.embed(normalizedQuery);
+            log.debug("Generated query embedding with dimension: {}", queryEmbedding.size());
+
+            // Step 2: Execute independent retrieval branches concurrently.
             Common.Filter productFilter = buildQdrantFilter(extractedFilters);
-            List<ScoredPoint> productPoints = executeSearch(collectionName, queryEmbedding, limit, scoreThreshold, productFilter);
-            List<ScoredPoint> scoredPoints = new ArrayList<>(productPoints);
+            CompletableFuture<List<ScoredPoint>> productFuture = searchCollectionAsync(
+                    collectionName, queryEmbedding, effectiveLimit, scoreThreshold, productFilter
+            );
+            CompletableFuture<List<ScoredPoint>> docFuture = shouldSearchDocumentCollection(extractedFilters)
+                    ? searchCollectionAsync(docCollectionName, queryEmbedding, effectiveLimit, scoreThreshold, null)
+                            .exceptionally(ex -> {
+                                log.warn("Document collection {} search failed: {}", docCollectionName, ex.getMessage());
+                                return List.of();
+                            })
+                    : CompletableFuture.completedFuture(List.of());
+            CompletableFuture<Map<Long, Float>> sparseFuture = CompletableFuture.supplyAsync(
+                    () -> loadSparseProductScores(normalizedQuery, Math.max(effectiveLimit * 3, keywordCandidateLimit))
+            ).exceptionally(ex -> {
+                log.warn("Sparse product search failed: {}", ex.getMessage());
+                return Collections.emptyMap();
+            });
 
-            try {
-                if (qdrantClient.collectionExistsAsync(docCollectionName).get()) {
-                    List<ScoredPoint> docPoints = executeSearch(docCollectionName, queryEmbedding, limit, scoreThreshold, null);
-                    scoredPoints.addAll(docPoints);
-                }
-            } catch (Exception ex) {
-                log.warn("Document collection {} not available or search failed: {}", docCollectionName, ex.getMessage());
-            }
+            List<ScoredPoint> productPoints = joinFuture(productFuture, "Product collection search failed");
+            List<ScoredPoint> docPoints = joinFuture(docFuture, "Document collection search failed");
+            Map<Long, Float> sparseScores = joinFuture(sparseFuture, "Sparse product search failed");
+            List<ScoredPoint> scoredPoints = new ArrayList<>(productPoints);
+            scoredPoints.addAll(docPoints);
 
             log.info("Found {} total results across collections for query", scoredPoints.size());
 
@@ -119,7 +135,7 @@ public class DenseRetrievalService {
             List<SearchResult> results = scoredPoints.stream()
                     .map(this::convertToSearchResult)
                     .collect(Collectors.toList());
-            results = rerankHybrid(normalizedQuery, results, limit);
+            results = rerankHybrid(normalizedQuery, results, effectiveLimit, sparseScores);
 
             // Step 5: Build response
             long executionTime = System.currentTimeMillis() - startTime;
@@ -199,6 +215,62 @@ public class DenseRetrievalService {
         }
 
         return qdrantClient.searchAsync(searchBuilder.build()).get();
+    }
+
+    private CompletableFuture<List<ScoredPoint>> searchCollectionAsync(
+            String targetCollection,
+            List<Float> queryEmbedding,
+            int limit,
+            float scoreThreshold,
+            Common.Filter filter
+    ) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return executeSearch(targetCollection, queryEmbedding, limit, scoreThreshold, filter);
+            } catch (ExecutionException | InterruptedException ex) {
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                throw new CompletionException(ex);
+            }
+        });
+    }
+
+    private <T> T joinFuture(CompletableFuture<T> future, String errorMessage) {
+        try {
+            return future.join();
+        } catch (CompletionException ex) {
+            throw new RetrievalException(errorMessage, ex.getCause() == null ? ex : ex.getCause());
+        }
+    }
+
+    private boolean shouldSearchDocumentCollection(ExtractedFilters filters) {
+        if (filters != null && (filters.type() != null || filters.brand() != null || filters.name() != null)) {
+            return false;
+        }
+        return isDocumentCollectionAvailable();
+    }
+
+    private boolean isDocumentCollectionAvailable() {
+        long now = System.currentTimeMillis();
+        if (now - docCollectionCheckedAt < COLLECTION_EXISTS_CACHE_TTL_MS) {
+            return docCollectionAvailable;
+        }
+
+        synchronized (this) {
+            long recheck = System.currentTimeMillis();
+            if (recheck - docCollectionCheckedAt < COLLECTION_EXISTS_CACHE_TTL_MS) {
+                return docCollectionAvailable;
+            }
+            try {
+                docCollectionAvailable = qdrantClient.collectionExistsAsync(docCollectionName).get();
+            } catch (Exception ex) {
+                docCollectionAvailable = false;
+                log.warn("Document collection {} not available: {}", docCollectionName, ex.getMessage());
+            }
+            docCollectionCheckedAt = recheck;
+            return docCollectionAvailable;
+        }
     }
 
     /**
@@ -342,13 +414,19 @@ public class DenseRetrievalService {
     /**
      * Hybrid reranking: dense score + sparse rank + lexical overlap.
      */
-    private List<SearchResult> rerankHybrid(String normalizedQuery, List<SearchResult> denseResults, int limit) {
+    private List<SearchResult> rerankHybrid(
+            String normalizedQuery,
+            List<SearchResult> denseResults,
+            int limit,
+            Map<Long, Float> sparseScores
+    ) {
         if (denseResults.isEmpty()) {
             return denseResults;
         }
 
-        int sparseLimit = Math.max(limit * 3, keywordCandidateLimit);
-        Map<Long, Float> sparseScores = loadSparseProductScores(normalizedQuery, sparseLimit);
+        if (sparseScores == null) {
+            sparseScores = Collections.emptyMap();
+        }
         float weightSum = sanitizeWeights(denseWeight, sparseWeight, lexicalWeight);
 
         float maxDense = denseResults.stream()

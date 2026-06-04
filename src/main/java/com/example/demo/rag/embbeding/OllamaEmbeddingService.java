@@ -26,7 +26,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
      * Số chunk tối đa gửi trong một lần gọi Ollama /api/embed
      * Ollama hỗ trợ nhận List<String> input nên nhiều chunk = ít round-trip hơn.
      */
-    private static final int DEFAULT_BATCH_SIZE = 32;
+    private static final int DEFAULT_BATCH_SIZE = 128;
 
     /**
      * Giới hạn số batch gọi đồng thời lên Ollama để tránh quá tải.
@@ -52,7 +52,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
             @Value("${ollama.embedding.batch-timeout-seconds:180}") long batchTimeoutSeconds,
             @Value("${ollama.embedding.single-retry-count:2}") long singleRetryCount,
             @Value("${ollama.embedding.batch-retry-count:1}") long batchRetryCount,
-            @Value("${ollama.embedding.batch-size:32}") int configuredBatchSize,
+            @Value("${ollama.embedding.batch-size:128}") int configuredBatchSize,
             @Value("${ollama.embedding.max-concurrent-batches:2}") int configuredMaxConcurrentBatches
     ) {
         ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
@@ -176,10 +176,10 @@ public class OllamaEmbeddingService implements EmbeddingService {
      * Sinh embedding vector cho nhiều đoạn văn bản cùng lúc.
      * <p>
      * Chiến lược:
-     * 1. Phân chia danh sách đầu vào thành các batch nhỏ (kích thước BATCH_SIZE = 64).
+     * 1. Phân chia danh sách đầu vào thành các batch theo batchSize cấu hình.
      * 2. Mỗi batch gửi một HTTP POST lên Ollama /api/embed với trường "input" là List&lt;String&gt;.
      *    Ollama hỗ trợ batch input nên đây là cách hiệu quả nhất để tránh overhead HTTP.
-     * 3. Các batch được gửi song song, giới hạn tối đa MAX_CONCURRENT_BATCHES = 4 tác vụ đồng thời
+     * 3. Các batch được gửi song song, giới hạn tối đa maxConcurrentBatches tác vụ đồng thời
      *    thông qua Semaphore để tránh làm quá tải máy chủ Ollama cục bộ.
      * 4. Kết quả các batch được ghép lại theo đúng thứ tự ban đầu.
      * </p>
