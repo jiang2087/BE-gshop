@@ -9,9 +9,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,6 +36,19 @@ public class ChatController {
         return ResponseEntity.ok(
                 chatClient.callChatWithRag(request.conversationId(), request.query(), request.limit())
         );
+    }
+
+    @GetMapping(value = "/rag/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> ragChatStream(
+            @RequestParam("q") @NotBlank String query,
+            @RequestParam(value = "limit", defaultValue = "8") @Min(1) int limit
+    ) {
+        return chatClient.callChatWithRagStream(query, limit);
+    }
+
+    @PostMapping(value = "/rag/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> ragChatStreamWithMemory(@Valid @RequestBody RagChatRequest request) {
+        return chatClient.callChatWithRagStream(request.conversationId(), request.query(), request.limit());
     }
 
     @PostMapping("/rag/conversations")
