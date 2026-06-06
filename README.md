@@ -1,7 +1,5 @@
 # G-Shop - Website thương mại điện tử tích hợp Chatbot RAG
 
-README này tóm tắt nội dung dự án từ `DATN_NguyenVanHauGiang_2022604193.docx` và sử dụng các sơ đồ trong thư mục `images`.
-
 ## Tổng quan
 
 G-Shop là website thương mại điện tử dành cho sản phẩm công nghệ. Hệ thống tích hợp chatbot AI dựa trên kiến trúc RAG (Retrieval-Augmented Generation) để hỗ trợ người dùng tìm kiếm sản phẩm, xem thông tin chi tiết, quản lý giỏ hàng, đặt hàng, áp dụng voucher, theo dõi lịch sử đơn hàng và hỏi đáp về sản phẩm.

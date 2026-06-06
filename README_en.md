@@ -1,6 +1,5 @@
 # G-Shop - E-Commerce Website with RAG Chatbot
 
-This README summarizes the project from `DATN_NguyenVanHauGiang_2022604193.docx` and includes diagrams from the `images` directory.
 
 ## Overview
 
